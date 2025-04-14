@@ -9,6 +9,7 @@ axios.defaults.timeout = 1000000 // 超时时间
 
 axios.defaults.withCredentials = false
 
+// const server_port = "localhost:28003"
 const server_port = "chen.test.com"
 
 const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';

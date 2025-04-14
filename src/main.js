@@ -11,6 +11,7 @@ Vue.use(ElementUI)
 
 
 import VueSocketIO from 'vue-socket.io'
+import SocketIO from "socket.io-client";
 const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
 
 console.log("用户使用协议类型===", protocol, window.location.protocol)
@@ -18,16 +19,21 @@ console.log("用户使用协议类型===", protocol, window.location.protocol)
 if(protocol=="http:"){
   Vue.use(new VueSocketIO({
    debug: true,
-   connection: 'http://chen.test.com',
-   options: { path: '/sock/socket.io' }
+   connection: SocketIO("http://chen.test.com/", {
+    autoConnect: false ,// 自动连接
+    }),
+   options: { path: '/socket.io' },
+   extraHeaders: { "Access-Control-Allow-Origin": "*" }
   }));
 }else{
   Vue.use(new VueSocketIO({
    debug: false,
    connection: 'https://chen.test.com',
-   options: { path: '/sock/socket.io' }
+   options: { path: '/sock/socket.io' },
+   extraHeaders: { "Access-Control-Allow-Origin": "*" }
   }));
 }
+
 
 
 const app = new Vue({
