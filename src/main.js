@@ -19,7 +19,7 @@ console.log("用户使用协议类型===", protocol, window.location.protocol)
 if(protocol=="http:"){
   Vue.use(new VueSocketIO({
    debug: true,
-   connection: SocketIO("http://chen.test.com/", {
+   connection: SocketIO("http://chen.test.com/sock/", {
     autoConnect: false ,// 自动连接
     }),
    options: { path: '/socket.io' },
@@ -28,7 +28,7 @@ if(protocol=="http:"){
 }else{
   Vue.use(new VueSocketIO({
    debug: false,
-   connection: 'https://chen.test.com',
+   connection: 'https://chen.test.com/sock/',
    options: { path: '/sock/socket.io' },
    extraHeaders: { "Access-Control-Allow-Origin": "*" }
   }));
