@@ -85,11 +85,14 @@
 
 <script>
 export default {
-  name: 'HelloWorld',
+  name: "HelloWorld",
   data () {
     return {
-      msg: 'Welcome to Your Vue.js App'
+      msg: "Welcome to Your Vue.js App"
     }
+  },
+  mounted () {
+    console.log("hello====", this.$store)
   }
 }
 </script>
