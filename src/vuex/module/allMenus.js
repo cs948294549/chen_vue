@@ -6,7 +6,8 @@ const state = {
     {
       "id": 1, "name": "图片处理", "group": "分组1", "order": "100", "path": "", "hide":false, "children": [
         {"id":2,"name":"文字提取","group":"","order":"1","path":"pages/test1","hide":false,"children":[]},
-        {"id":3,"name":"去除文字","group":"","order":"1","path":"pages/test2","hide":false,"children":[]},
+        {"id":3,"name":"去除文字","group":"","order":"2","path":"pages/test2","hide":false,"children":[]},
+        {"id":11,"name":"图片框选","group":"","order":"3","path":"pages/test6","hide":false,"children":[]},
       ],
     },
     {
