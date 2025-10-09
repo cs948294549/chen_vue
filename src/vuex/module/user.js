@@ -44,6 +44,8 @@ const user = {
           children: [],
         }
         let route_dict = {}
+        
+        //默认进来第一个路由
         let first_path = ""
         for(let i=0;i<add_routes.length;i++){
           if(add_routes[i]["children"].length>0){

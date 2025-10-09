@@ -41,7 +41,7 @@ const bussiness_route = [
   {
     path: "/",
     component: Layout,
-    // redirect: "/main",
+    // redirect: "/index",
     name: "main",
     meta: {
       rightCode: 1000
