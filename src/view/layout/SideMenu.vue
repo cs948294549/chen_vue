@@ -13,20 +13,20 @@
         <template v-for="(item, index) in route_list" v-if="!item.hide&&item.group == cur_group">
           <el-submenu v-if="item.children.length>0" :index="index+''" :key="index">
             <template slot="title">
-              <i :class="item.iconCls?item.iconCls:'el-icon-collection-tag'"></i>
+              <!-- <i :class="item.iconCls?item.iconCls:'el-icon-collection-tag'"></i> -->
               <span slot="title">{{ item.name }}</span>
             </template>
 
             <template v-for="child in item.children">
               <el-menu-item v-if="!child.hide" :index="child.path" :key="child.path">
-                <i :class="child.iconCls?child.iconCls:'el-icon-collection-tag'"></i>
+                <!-- <i :class="child.iconCls?child.iconCls:'el-icon-collection-tag'"></i> -->
                 <span slot="title">{{ child.name }}</span>
               </el-menu-item>
             </template>
           </el-submenu>
 
           <el-menu-item v-else :index="item.path" :key="item.path">
-            <i :class="item.iconCls?item.iconCls:'el-icon-collection-tag'"></i>
+            <!-- <i :class="item.iconCls?item.iconCls:'el-icon-collection-tag'"></i> -->
             <span slot="title">{{ item.name }}</span>
           </el-menu-item>
         </template>

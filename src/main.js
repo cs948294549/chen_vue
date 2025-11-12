@@ -10,6 +10,7 @@ import '@/router/permission.js';
 Vue.use(ElementUI)
 
 
+//全局使用websocket
 import VueSocketIO from 'vue-socket.io'
 import SocketIO from "socket.io-client";
 const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';

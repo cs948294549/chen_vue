@@ -3,11 +3,11 @@
 const state = {
   //view为基础目录
   menuList: [
+    //分组1列表
     {
       "id": 1, "name": "图片处理", "group": "分组1", "order": "100", "path": "", "hide":false, "children": [
-        {"id":2,"name":"文字提取","group":"","order":"1","path":"pages/test1","hide":false,"children":[]},
-        {"id":3,"name":"去除文字","group":"","order":"2","path":"pages/test2","hide":false,"children":[]},
-        {"id":11,"name":"图片框选","group":"","order":"3","path":"pages/test6","hide":false,"children":[]},
+        {"id":3,"name":"去除文字", "group":"","order":"2","path":"pages/test2","hide":false,"children":[]},
+
       ],
     },
     {
@@ -16,6 +16,8 @@ const state = {
     {
       "id":9,"name":"其他","group":"分组1","order":"301","path":"pages/ts/test5","hide":false,"children":[]
     },
+
+    //分组2列表
     {
       "id":10,"name":"其他1","group":"分组2","order":"301","path":"pages/ts/test5","hide":false,"children":[]
     },
@@ -24,7 +26,17 @@ const state = {
         {"id":5,"name":"测试1","group":"","order":"1","path":"pages/test3","hide":false,"children":[]},
         {"id":6,"name":"测试2","group":"","order":"1","path":"pages/test4","hide":false,"children":[]},
       ],
-    }
+    },
+
+    //demo列表
+    {
+      "id":100,"name":"测试页面","group":"demo","order":"100","path":"","hide":false,"children":[
+        {"id":101,"name":"拖动","group":"","order":"5","path":"pages/demo/drag/dragParent","hide":false,"children":[]},
+        {"id":102,"name":"G6流程图","group":"","order":"6","path":"pages/demo/workflow/g6_flow","hide":false,"children":[]},
+        {"id":103,"name":"图片框选", "group":"","order":"3","path":"pages/demo/images/test6","hide":false,"children":[]},
+        {"id":104,"name":"WebSocket测试", "group":"","order":"1","path":"pages/demo/websocket/test1","hide":false,"children":[]},
+      ]
+    },
   ]
 }
 

@@ -32,7 +32,7 @@ module.exports = {
       : config.dev.assetsPublicPath
   },
   resolve: {
-    extensions: ['.js', '.vue', '.json'],
+    extensions: ['.js', '.vue', '.json', '.scss'],
     alias: {
       'vue$': 'vue/dist/vue.esm.js',
       '@': resolve('src'),
@@ -74,8 +74,18 @@ module.exports = {
           limit: 10000,
           name: utils.assetsPath('fonts/[name].[hash:7].[ext]')
         }
+      },
+      // 添加 Sass/SCSS 处理规则（关键配置）
+      {
+        test: /\.s[ac]ss$/,  // 匹配 .scss 和 .sass 文件
+        use: [
+          'vue-style-loader',  // 将样式注入到 Vue 组件
+          'css-loader',        // 解析 CSS
+          'sass-loader'        // 解析 Sass/SCSS（依赖 sass）
+        ]
       }
     ]
+
   },
   node: {
     // prevent webpack from injecting useless setImmediate polyfill because Vue
