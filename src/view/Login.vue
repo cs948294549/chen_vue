@@ -98,7 +98,7 @@ export default {
     getRouteList(){
       let that = this
       login_api.getRoleRouteList({},{}).then(function (response) {
-        console.log("加载 route===",response.data)
+        // console.log("加载 route===",response.data)
         if(response.data.code==0){
           localStorage.setItem("RouteList", JSON.stringify(response.data.data))
           that.$router.push('/');
@@ -143,11 +143,11 @@ export default {
               "user_info":response.data.data["user_info"],
               "token_sign": secret
             }
-            console.log("写入信息==",user_infos)
+            // console.log("写入信息==",user_infos)
 
 
             await that.$store.dispatch("user/login", user_infos)
-            console.log("写入完成，获取路由")
+            // console.log("写入完成，获取路由")
             await that.getRouteList()
             that.$message({
               type: 'success',
