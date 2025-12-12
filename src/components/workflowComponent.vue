@@ -95,6 +95,8 @@
         graph:{},
         nodes:{},
         edges:{},
+        logoSvgBase64:'/static/images/workflow.svg',
+
         init_cfg:{
         	// ... 其他G6原生入参
         	// 所有节点默认配置
@@ -159,6 +161,7 @@
       }
   	},
     mounted() {
+      console.log("-=-=-=-=", this.logoSvgBase64)
     	// 创建画布
     	this.$nextTick(() => {
     	  this.createGraphic();
@@ -431,19 +434,21 @@
                 // 是否显示 icon，值为 false 则不渲染 icon
                 show: true,
                 // icon 的地址，字符串类型
-                img: 'https://gw.alipayobjects.com/zos/basement_prod/4f81893c-1806-4de4-aff3-9a6b266bc8a2.svg',
+                // img: "https://gw.alipayobjects.com/zos/basement_prod/4f81893c-1806-4de4-aff3-9a6b266bc8a2.svg",
+                img: this.logoSvgBase64,
               },
               // 节点中表示状态的 icon 配置
               stateIcon: {
                 // 是否显示 icon，值为 false 则不渲染 icon
-                show: true,
+                show: false,
                 // icon 的地址，字符串类型
-                img: 'https://gw.alipayobjects.com/zos/basement_prod/300a2523-67e0-4cbf-9d4a-67c077b40395.svg',
+                img: this.logoSvgBase64,
               },
               x: position.x,
               y: position.y
             }
           }
+          console.log("add node===", node)
           this.graph.addItem('node', node);
           this.nodes[node["id"]]=node
         }

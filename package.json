@@ -11,8 +11,10 @@
     "build": "node build/build.js"
   },
   "dependencies": {
+    "@antv/g2": "^4.2.10",
     "@antv/g6": "^4.3.7",
     "axios": "^0.19.2",
+    "crypto-js": "^4.2.0",
     "element-ui": "^2.15.14",
     "js-cookie": "^3.0.5",
     "less": "^3.13.1",
@@ -21,7 +23,9 @@
     "vue": "^2.7.16",
     "vue-router": "^3.0.1",
     "vue-socket.io": "^3.0.10",
-    "vuex": "^3.6.2"
+    "vuex": "^3.6.2",
+    "wordcloud": "^1.2.3",
+    "xlsx": "^0.17.5"
   },
   "devDependencies": {
     "autoprefixer": "^7.1.2",

@@ -21,7 +21,6 @@ router.beforeEach(async (to, from, next) => {
           next({path: to.path, query:to.query})
         }
       } catch (error) {
-        console.log("错误", error)
         if(to.path === "/"){
           next({path: store.getters["user/routes"][0]["redirect"], query:to.query})
         }else{
@@ -30,7 +29,7 @@ router.beforeEach(async (to, from, next) => {
       }
     } else {
       console.log("路由存在，判断去程路由是否存在", to.path )
-      if(to.path === "/404"){
+      if(to.path === "/404"|to.path === "/Login"){
         next()
       }else if(to.path === "/"){
         next({path: store.getters["user/routes"][0]["redirect"], query:to.query})
@@ -53,7 +52,10 @@ router.beforeEach(async (to, from, next) => {
     }
   } else {
     console.log("token不存在,进行用户认证添加token")
-    await store.dispatch('user/login');
-    next("/404");
+    if(to.path === "/404"|to.path === "/Login"){
+      next()
+    }else{
+      next(`/Login`);
+    }
   }
 });

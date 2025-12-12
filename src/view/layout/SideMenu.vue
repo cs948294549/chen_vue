@@ -18,14 +18,14 @@
             </template>
 
             <template v-for="child in item.children">
-              <el-menu-item v-if="!child.hide" :index="child.path" :key="child.path">
+              <el-menu-item v-if="!child.hide" :index="child.path" :key="child.page_id">
                 <!-- <i :class="child.iconCls?child.iconCls:'el-icon-collection-tag'"></i> -->
                 <span slot="title">{{ child.name }}</span>
               </el-menu-item>
             </template>
           </el-submenu>
 
-          <el-menu-item v-else :index="item.path" :key="item.path">
+          <el-menu-item v-else :index="item.path" :key="item.page_id">
             <!-- <i :class="item.iconCls?item.iconCls:'el-icon-collection-tag'"></i> -->
             <span slot="title">{{ item.name }}</span>
           </el-menu-item>
@@ -75,6 +75,7 @@ export default {
       this.refresh_flag = true
     },
     selectmenu(index, index_path){
+      console.log("选中===",index, index_path)
       this.$router.push({path:'/'+index,query:{}});
     },
   },

@@ -48,7 +48,7 @@ export default G6 => {
 		getShapeStyle (cfg) {
 			const width = cfg.style.width || 80;
 			const height = cfg.style.height || 40;
-		
+
 			return getStyle.call(this, {
 				width,
 				height,
@@ -73,8 +73,8 @@ export default G6 => {
 									...$item,
 									...$item.style,
 									x: -attrs.width/2 + 10,
-									y: 0 - attrs.iconStyles.height/2
-								},
+									y: 0 - attrs.iconStyles.height/2,
+                },
 								draggable: true,
 								className,
 							});
@@ -111,21 +111,21 @@ export default G6 => {
 			group.showAnchor = group => {
 				this.drawAnchor(cfg, group);
 			};
-			
+
 			group.showInAnchor = group => {
 				this.drawInAnchor(cfg, group);
 			};
-			
+
 			group.showOutAnchor = group => {
 				this.drawOutAnchor(cfg, group);
 			};
-			
+
 			group.clearAnchor = group => {
 				group.anchorShapes && group.anchorShapes.forEach(a => a.remove());
 				group.anchorShapes = [];
 			};
 		},
-		
+
 		//绘制所有锚点
 		drawAnchor (cfg, group) {
 			const { type, direction, anchorPointStyles } = group.getFirst().attr();
@@ -201,7 +201,7 @@ export default G6 => {
 				return group.anchorShapes.filter(c => c.get('className') === 'node-anchor-bg');
 			};
 		},
-		
+
 		//绘制输入锚点
 		drawInAnchor (cfg, group) {
 			const { type, direction, anchorPointStyles } = group.getFirst().attr();
@@ -278,7 +278,7 @@ export default G6 => {
 				return group.anchorShapes.filter(c => c.get('className') === 'node-anchor-bg');
 			};
 		},
-		
+
 		//绘制输出锚点
 		drawOutAnchor (cfg, group) {
 			const { type, direction, anchorPointStyles } = group.getFirst().attr();
@@ -355,7 +355,7 @@ export default G6 => {
 				return group.anchorShapes.filter(c => c.get('className') === 'node-anchor-bg');
 			};
 		},
-		
+
 		addLabel (cfg, group, attrs) {
 			const { label, labelCfg, labels } = attrs;
 			    // 字体小于12时 svg会报错
@@ -408,7 +408,7 @@ export default G6 => {
 				fill:   '#40a9ff',
 				radius: [4, 0, 0, 4],
 			};
-			
+
 			if (!preRect || preRect.show !== false) {
 				group.addShape('rect', {
 					attrs: {
@@ -438,12 +438,12 @@ export default G6 => {
 				draggable:  true,
 				attrs,
 			});
-			
+
 			//给 group 添加自定义方法 按className查找元素
 			group.$getItem = className => {
 				return group.get('children').find(item => item.get('className') === className);
 			};
-			
+
 			if (this.type === 'modelRect-node') {
 				this.drawModelRect(group, attrs);
 			}
@@ -453,8 +453,8 @@ export default G6 => {
 			this.drawIcon(cfg, group, attrs);
 			// 添加锚点
 			this.initAnchor(cfg, group);
-			
-			
+
+
 			return shape;
 		},
 		/* 更新节点，包含文本 */
@@ -463,7 +463,7 @@ export default G6 => {
 			const { attrs } = node.get('keyShape');
 			const text = node.get('group').$getItem('node-text');
 			const item = node.get('group').get('children')[0];
-	
+
 			setTimeout(() => {
 				// 更新文本内容
 				text && text.attr({
@@ -494,9 +494,9 @@ export default G6 => {
 		        'nodeOnDragEnd',
 			];
 			const group = item.getContainer();
-			
+
 			if (group.get('destroyed')) return;
-			
+
 			if (buildInEvents.includes(name)) {
 				// 内部this绑定到了当前item实例
 				itemEvents[name].call(this, value, group);

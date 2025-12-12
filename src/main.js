@@ -15,35 +15,17 @@ import VueSocketIO from 'vue-socket.io'
 import SocketIO from "socket.io-client";
 const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
 
-console.log("用户使用协议类型===", protocol, window.location.protocol)
-
-// if(protocol=="http:"){
-//   Vue.use(new VueSocketIO({
-//    debug: true,
-//    connection: SocketIO("http://chen.test.com/sock", {
-//     autoConnect: false ,// 自动连接
-//    }),
-//    options: { path: '/sock/socket.io' },
-//    extraHeaders: { "Access-Control-Allow-Origin": "*" }
-//   }));
-// }else{
-//   Vue.use(new VueSocketIO({
-//    debug: false,
-//    connection: 'https://chen.test.com/',
-//    options: { path: '/sock/socket.io' },
-//    extraHeaders: { "Access-Control-Allow-Origin": "*" }
-//   }));
-// }
+// console.log("用户使用协议类型===", protocol, window.location.protocol)
 
 if(protocol=="http:"){
   Vue.use(new VueSocketIO({
    debug: true,
-   connection: SocketIO('http://chen.test.com', {path:'/sock/socket.io'}),
+   connection: SocketIO('http://47.98.235.241:80', {path:'/sock/socket.io'}),
   }));
 }else{
   Vue.use(new VueSocketIO({
    debug: true,
-   connection: SocketIO('https://chen.test.com', {path:'/sock/socket.io'}),
+   connection: SocketIO('https://47.98.235.241:80', {path:'/sock/socket.io'}),
   }));
 }
 

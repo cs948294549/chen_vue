@@ -10,6 +10,14 @@ export const whiteRoutes = [
     }
   },
   {
+    path: '/Login',
+    name: 'login',
+    component: () => import(/* webpackChunkName: "404" */ '@/view/Login'),
+    meta: {
+      title: '登陆'
+    }
+  },
+  {
     path: '/unauthorized-index',
     redirect: '/unauthorized',
     component: Layout,

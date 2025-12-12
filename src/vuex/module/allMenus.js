@@ -1,42 +1,39 @@
 /* eslint-disable */
 // 侧边菜单模块的状态
 const state = {
-  //view为基础目录
-  menuList: [
-    //分组1列表
+  //默认菜单
+  default_menu: [
+    //系统管理功能
     {
-      "id": 1, "name": "图片处理", "group": "分组1", "order": "100", "path": "", "hide":false, "children": [
-        {"id":3,"name":"去除文字", "group":"","order":"2","path":"pages/test2","hide":false,"children":[]},
-
-      ],
+      "id": "id-900", "name": "用户管理", "group": "系统管理", "order": "400", "path":"pages/systemManage/userManage", "hide":false, "children": [],
     },
     {
-      "id":7,"name":"其他","group":"分组1","order":"201","path":"pages/test3","hide":false,"children":[]
-    },
-    {
-      "id":9,"name":"其他","group":"分组1","order":"301","path":"pages/ts/test5","hide":false,"children":[]
+      "id": "id-901", "name": "页面管理", "group": "系统管理", "order": "401", "path":"pages/systemManage/pageManage", "hide":false, "children": [],
     },
 
-    //分组2列表
-    {
-      "id":10,"name":"其他1","group":"分组2","order":"301","path":"pages/ts/test5","hide":false,"children":[]
-    },
-    {
-      "id":4,"name":"其他","group":"分组2","order":"200","path":"","hide":false,"children":[
-        {"id":5,"name":"测试1","group":"","order":"1","path":"pages/test3","hide":false,"children":[]},
-        {"id":6,"name":"测试2","group":"","order":"1","path":"pages/test4","hide":false,"children":[]},
-      ],
-    },
 
     //demo列表
     {
-      "id":100,"name":"测试页面","group":"demo","order":"100","path":"","hide":false,"children":[
+      "id":100,"name":"测试页面","group":"demo","order":"300","path":"","hide":false,"children":[
         {"id":101,"name":"拖动","group":"","order":"5","path":"pages/demo/drag/dragParent","hide":false,"children":[]},
         {"id":102,"name":"G6流程图","group":"","order":"6","path":"pages/demo/workflow/g6_flow","hide":false,"children":[]},
         {"id":103,"name":"图片框选", "group":"","order":"3","path":"pages/demo/images/test6","hide":false,"children":[]},
         {"id":104,"name":"WebSocket测试", "group":"","order":"1","path":"pages/demo/websocket/test1","hide":false,"children":[]},
+        {"id":105,"name":"词云测试", "group":"","order":"1","path":"pages/demo/wordcloud/word_main","hide":false,"children":[]},
+        {"id":106,"name":"旭日图测试", "group":"","order":"1","path":"pages/demo/antvg2/test2","hide":false,"children":[]},
       ]
     },
+    {
+      "id": 1, "name": "图片处理", "group": "分组1", "order": "100", "path": "", "hide":false, "children": [
+        {"id":3,"name":"去除文字", "group":"","order":"2","path":"pages/test2","hide":false,"children":[]}
+      ],
+    },
+
+  ],
+
+  //view为基础目录
+  menuList: [
+
   ]
 }
 
@@ -49,65 +46,43 @@ const mutations = {
 
 // 异步操作（这里只是示例，没有实际异步逻辑）
 const actions = {
-  fetchRoute (context) {
-    return new Promise((resolve, reject) => {
-      let route_list = []
-      console.log("开始构造路由")
-      for(let i=0;i<state.menuList.length;i++){
-
+  fetchRoute (context, routes) {
+    // console.log("获取路由信息=开始解析==", routes)
+    const route_list = []
+    for(let i=0;i<routes.length;i++){
+      let _r = {
+        "id": routes[i]["page_id"],
+        "name": routes[i]["name"],
+        "group": routes[i]["classify"],
+        "order": routes[i]["sort_num"],
+        "path": routes[i]["path"],
+        "hide": routes[i]["hide"]=="1"?true:false,
+        "icon": routes[i]["icon"],
+        "children":[],
       }
-      resolve(route_list)
-    })
-  },
-  fetchData (context) {
-    return new Promise((resolve, reject) => {
-      // 模拟异步请求，使用 setTimeout 模拟延迟
-      setTimeout(() => {
-        const mockData = [
-          {
-            "uri": "",
-            "name": "主页",
-            "children": [
-              {
-                "uri": "/index",
-                "name": "主页1",
-                "children": []
-              },
-              {
-                "uri": "/index",
-                "name": "主页2",
-                "children": []
-              }
-            ]
-          },
-          {
-            "uri": "",
-            "name": "测试页面",
-            "children": [
-              {
-                "uri": "/index",
-                "name": "测试页1",
-                "children": []
-              },
-              {
-                "uri": "/index",
-                "name": "测试页2",
-                "children": []
-              }
-            ]
-          }
-        ]
-        console.log("设置菜单列表", mockData)
-        context.commit("setMenuList", mockData)
-        resolve(mockData)
-      }, 1000)
-    })
+      for(let j=0;j<routes[i]["children"].length;j++){
+        let _r_c = {
+          "id": routes[i]["children"][j]["page_id"],
+          "name": routes[i]["children"][j]["name"],
+          "group": routes[i]["children"][j]["classify"],
+          "order": routes[i]["children"][j]["sort_num"],
+          "path": routes[i]["children"][j]["path"],
+          "hide": routes[i]["children"][j]["hide"]=="1"?true:false,
+          "icon": routes[i]["children"][j]["icon"],
+          "children":[],
+        }
+        _r["children"].push(_r_c)
+      }
+      route_list.push(_r)
+    }
+    context.commit("setMenuList", route_list)
   }
 }
 
 // 获取状态的方法
 const getters = {
   menuList: (state) => state.menuList,
+  default_menu: (state) => state.default_menu,
 }
 
 export default {
