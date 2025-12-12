@@ -138,7 +138,7 @@
       };
     },
     mounted() {
-      console.log("查看当前页面==", this.page_info)
+      // console.log("查看当前页面==", this.page_info)
       this.searchKey()
     },
     methods:{
@@ -279,7 +279,7 @@
               });
             }
           }).catch(function (error) {
-              console.log("====",error)
+              console.log(error)
               that.$message({
                 type: 'error',
                 message: "删除异常"

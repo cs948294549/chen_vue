@@ -6,14 +6,14 @@ const vueObj = new Vue();
 
 router.beforeEach(async (to, from, next) => {
   if (store.getters["user/token"]&&store.getters["user/token"]!==undefined) {
-    console.log("token存在，判断路由是否加载", store.getters["user/token"])
+    // console.log("token存在，判断路由是否加载", store.getters["user/token"])
     if (store.getters["user/routes"].length<=0) {
-      console.log("路由缺失，重新构建")
+      // console.log("路由缺失，重新构建")
       try {
         await store.dispatch("user/getRoutes")
         resetRouter();
         const accessRoutes = store.getters["user/routes"]
-        console.log("重新加载路由==", accessRoutes)
+        // console.log("重新加载路由==", accessRoutes)
         await router.addRoutes(accessRoutes);
         if(to.path === "/"){
           next({path: store.getters["user/routes"][0]["redirect"], query:to.query})
@@ -28,7 +28,7 @@ router.beforeEach(async (to, from, next) => {
         }
       }
     } else {
-      console.log("路由存在，判断去程路由是否存在", to.path )
+      // console.log("路由存在，判断去程路由是否存在", to.path )
       if(to.path === "/404"|to.path === "/Login"){
         next()
       }else if(to.path === "/"){

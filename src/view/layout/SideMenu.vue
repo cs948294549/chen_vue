@@ -51,7 +51,7 @@ export default {
     getMenu () {
       this.$store.dispatch("sideMenu/fetchData").then(response => {
         this.userData = response
-        console.log("结果===", response)
+        // console.log("结果===", response)
       }).catch(error => {
         console.error("获取数据失败:", error)
       })
@@ -75,7 +75,7 @@ export default {
       this.refresh_flag = true
     },
     selectmenu(index, index_path){
-      console.log("选中===",index, index_path)
+      // console.log("选中===",index, index_path)
       this.$router.push({path:'/'+index,query:{}});
     },
   },

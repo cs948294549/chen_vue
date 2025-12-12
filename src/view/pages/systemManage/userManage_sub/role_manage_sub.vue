@@ -259,7 +259,7 @@
               });
             }
           }).catch(function (error) {
-              console.log("====",error)
+              console.log(error)
               that.$message({
                 type: 'error',
                 message: "删除异常"
@@ -275,7 +275,7 @@
 
 
       privilDiag(row){
-        console.log("角色页面权限配置")
+        // console.log("角色页面权限配置")
         this.role_name=row["rid"]
         this.role_info_cache=row
         this.dialog_page_flag=true

@@ -131,7 +131,7 @@
         feature_user:{},
 
         diag_update_flag:false,
-        
+
         role_list:[]
 
       };
@@ -147,7 +147,7 @@
         role_api.getRoleList({},{}).then(function(response){
           if(response.data.code==0){
             that.role_list = response.data.data
-            console.log("角色列表===",that.role_list)
+            // console.log("角色列表===",that.role_list)
           }else{
             that.$message({
               type: 'error',
@@ -175,7 +175,7 @@
         if(this.filter_role!=""){
           post_data["rid_reg"] = this.filter_role
         }
-        console.log("=====", post_data)
+        // console.log("=====", post_data)
         let that = this
         this.isload=true
         this.table_data=[]
@@ -216,7 +216,7 @@
           ...this.feature_user,
           "identify":lmd5.salt_identify("123456")
         }
-        console.log("新增信息===", post_data)
+        // console.log("新增信息===", post_data)
         role_api.addUser(post_data,{}).then(function(response){
           if(response.data.code==0){
             that.diag_flag=false
@@ -312,7 +312,7 @@
               });
             }
           }).catch(function (error) {
-              console.log("====",error)
+              console.log(error)
               that.$message({
                 type: 'error',
                 message: "删除异常"

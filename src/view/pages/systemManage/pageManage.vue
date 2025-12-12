@@ -17,7 +17,7 @@
       <el-table-column prop="sort_num" label="菜单顺序" show-overflow-tooltip align='left' min-width="30"></el-table-column>
       <el-table-column prop="hide" label="隐藏页面" show-overflow-tooltip align='left' min-width="50">
         <template slot-scope="scope">
-            {{ scope.row.hide===1? '是' : '否' }}
+            {{ scope.row.hide==='1'? '是' : '否' }}
           <!-- </el-tag> -->
         </template>
       </el-table-column>
@@ -174,20 +174,9 @@ export default {
   },
   mounted () {
     this.getList()
-    this.getRoutes_test()
-    
+
   },
   methods: {
-    getRoutes_test(){
-      let that = this
-      page_api.getRoleRouteList({},{}).then(function (response) {
-        console.log("route===",response.data)
-      })
-      .catch(function (error) {
-        console.log(error)
-      })
-    },
-    
     handleEdit (row) {
       console.log(row)
       this.editForm = {}
@@ -222,7 +211,7 @@ export default {
       let that = this
       that.$confirm('确定删除该条目?', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
       }).then(() => {
-        console.log("删除页面", row)
+        // console.log("删除页面", row)
         page_api.delPage({"page_id":row["page_id"]},{}).then(function (response) {
           if(response.data.code==0){
             that.$message({
@@ -280,11 +269,11 @@ export default {
         post_data["hide"]="1"
       }
 
-      console.log("新增数据===",JSON.stringify(post_data))
+      // console.log("新增数据===",JSON.stringify(post_data))
       let that = this
       this.isload=true
       page_api.addPage(post_data,{}).then(function (response) {
-        console.log("page add===",response.data)
+        // console.log("page add===",response.data)
         if(response.data.code==0){
           that.$message({
             type: 'success',
@@ -345,11 +334,11 @@ export default {
         post_data["hide"]="1"
       }
 
-      console.log("更新数据==", JSON.stringify(post_data))
+      // console.log("更新数据==", JSON.stringify(post_data))
       let that = this
       this.isload=true
       page_api.updatePage(post_data,{}).then(function (response) {
-        console.log("page add===",response.data)
+        // console.log("page add===",response.data)
         if(response.data.code==0){
           that.$message({
             type: 'success',
@@ -375,7 +364,7 @@ export default {
       let that = this
       page_api.getPageList({},{}).then(function (response) {
         that.routerTableData = response.data.data
-        console.log("页面列表==",response.data)
+        // console.log("页面列表==",response.data)
         that.PDirOptions = []
         that.routerTableData.forEach(item => {
           if (item.path === '') that.PDirOptions.push({label: item.name, value: item.page_id})
@@ -387,14 +376,14 @@ export default {
     },
 
     handleUri(row){
-      console.log("查询页面相关接口列表，并打开列表的增删改查")
+      // console.log("查询页面相关接口列表，并打开列表的增删改查")
       this.uri_title=row["name"]
       this.page_info_cache=row
       this.dialog_uri_flag=true
     },
 
     handleSelectionChange(val){
-      console.log("多选==",val)
+      // console.log("多选==",val)
     },
   },
   components:{
