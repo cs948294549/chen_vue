@@ -1,29 +1,29 @@
 <template>
-  <div style="display: flex;">
-    <div style="background-color: darkred;">
-      <p style="width: 200px; height: 20px; line-height: 20px; text-align: center;font-size: 16px; font-weight: bold; color: #ffffff;">OPS</p>
-    </div>
-
-    <!-- 这里可以添加顶部菜单的具体内容，如导航链接 -->
-    <div style="background-color: #335596;width: 100%; display: flex;">
-      <div v-if="refresh_flag" style="display: flex;">
-        <div class="menu" v-for="(item, index) in classic" :key="index" @click="changeGroup(item)">
-          <span v-if="activeName==item" style="color: #5a9cf8;">{{item}}</span>
-          <span v-else>{{item}}</span>
+  <div>
+    <div style="display: flex;">
+      <div style="background-color: darkred;">
+        <p style="width: 200px; height: 20px; line-height: 20px; text-align: center;font-size: 16px; font-weight: bold; color: #ffffff;">OPS</p>
+      </div>
+      <!-- 这里可以添加顶部菜单的具体内容，如导航链接 -->
+      <div style="background-color: #335596;width: 100%; display: flex;">
+        <div v-if="refresh_flag" style="display: flex;">
+          <div class="menu" v-for="(item, index) in classic" :key="index" @click="changeGroup(item)">
+            <span v-if="activeName==item" style="color: #5a9cf8;">{{item}}</span>
+            <span v-else>{{item}}</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div style="background-color: #335596;width: 150px;align-items: center;">
-      <el-dropdown style="width: 120px;" @command="handleCommand">
-        <el-button style="width: 120px;color: white" type="text" icon="el-icon-user-solid" >{{ this.$store.getters["user/user_info"].subname}}</el-button>
-        <el-dropdown-menu slot="dropdown">
-          <el-dropdown-item command="editPassword">修改密码</el-dropdown-item>
-          <el-dropdown-item command="logout">退出</el-dropdown-item>
-        </el-dropdown-menu>
-      </el-dropdown>
+      <div style="background-color: #335596;width: 150px;align-items: center;">
+        <el-dropdown style="width: 120px;" @command="handleCommand">
+          <el-button style="width: 120px;color: white" type="text" icon="el-icon-user-solid" >{{ this.$store.getters["user/user_info"].subname}}</el-button>
+          <el-dropdown-menu slot="dropdown">
+            <el-dropdown-item command="editPassword">修改密码</el-dropdown-item>
+            <el-dropdown-item command="logout">退出</el-dropdown-item>
+          </el-dropdown-menu>
+        </el-dropdown>
+      </div>
     </div>
-
     <el-dialog title="修改密码" :visible.sync="diag_editPassword" width="50%" append-to-body>
       <el-form v-model="feature_user" size="mini" label-width="80px">
         <el-form-item label="原密码">
@@ -66,10 +66,19 @@ export default {
         "new_passwd":"",
         "pre_new_passwd": "",
       },
+
+      //快捷标签
+      paths:[],
+
+      rightMenuShow:false,
+      left: 0,
+      top: 0
+
     }
   },
   mounted () {
     // console.log("当前用户==",JSON.stringify(this.$store.getters["user/user_info"]))
+    // console.log("当前url==",JSON.stringify(this.$store.getters["tabnav/tabnavBox"]))
   },
   methods: {
     reloadRoute (route){
@@ -145,8 +154,7 @@ export default {
             message: '修改失败，请重试'
           });
       })
-
-    }
+    },
   },
   components: {}
 }
@@ -163,4 +171,24 @@ export default {
     cursor: pointer;
     font-family: "Lucida Console", Courier, monospace;
   }
+  .tabnavBox {
+    display: flex;
+    justify-content: start;
+  }
+  .tabnavBox ul{
+    display: flex;
+    justify-content: start;
+  }
+  .tabnavBox li {
+    height: 30px;
+    line-height: 31px;
+    display: flex;
+    align-items: center;
+    border: 1px solid #cccccc;
+    overflow: hidden;
+  }
+  .tabnavBox li.active{
+      background: #3875cc;
+      color: #ffffff;
+    }
 </style>

@@ -74,9 +74,33 @@ export default {
       this.route_list = route_list
       this.refresh_flag = true
     },
+
     selectmenu(index, index_path){
       // console.log("选中===",index, index_path)
-      this.$router.push({path:'/'+index,query:{}});
+      let matched = false
+      let navTitle=""
+      for(let i=0;i<this.route_list.length;i++){
+        if(this.route_list[i]["children"].length>0){
+          for(let j=0;j<this.route_list[i]["children"].length;j++){
+            if(this.route_list[i]["children"][j]["path"]==index){
+              navTitle=this.route_list[i]["children"][j]["name"]
+              matched=true
+              break
+            }
+          }
+        }else{
+          if(this.route_list[i]["path"]==index){
+            navTitle=this.route_list[i]["name"]
+            matched=true
+          }
+        }
+        if(matched===true){
+          break
+        }
+      }
+      this.$store.dispatch("tabnav/addTab",{"title":navTitle,"path":index})
+      this.$router.push({path:'/'+index, query:{}});
+
     },
   },
   components: {}

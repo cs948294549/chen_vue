@@ -2,6 +2,7 @@ import Vue from "vue"
 import Vuex from "vuex"
 import allMenu from "./module/allMenus.js"
 import user from "./module/user.js"
+import tabnav from "./module/tabNav.js"
 
 // 安装 Vuex 插件
 Vue.use(Vuex)
@@ -19,7 +20,8 @@ const store = new Vuex.Store({
   // 模块
   modules: {
     "allMenu": allMenu,
-    "user": user
+    "user": user,
+    "tabnav": tabnav
   }
 })
 

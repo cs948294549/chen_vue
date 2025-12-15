@@ -3,12 +3,12 @@
     <TopMenu ref="top_menu" @changeGroup="changeGroupItem" />
     <div style="display: flex;min-height: 100vh;">
       <SideMenu ref="side_menu" />
-      <div style="flex: 1;">
-        <!-- <TabMenu></TabMenu> -->
+      <div style="flex: 1;margin: 10px;">
+        <TabMenu style="padding-bottom: 10px;border-bottom: 1px solid #eee;"></TabMenu>
         <!-- 这里是页面的主要内容区域 -->
         <transition name="main" mode="out-in">
           <!-- <el-card> -->
-          <router-view></router-view>
+          <router-view style="margin: 10px;"></router-view>
           <!-- </el-card> -->
         </transition>
       </div>
