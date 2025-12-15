@@ -52,6 +52,10 @@
 	  methods:{
       submit_table(){
         let rows = this.input_src.replace(/^\s*|\s*$/g,"").split("\n")
+        if(rows.length<=1){
+          rows= this.input_src.replace(/^\s*|\s*$/g,"").split("\\n")
+        }
+        
         let headers = []
         let tables = []
         for(let i=0;i<rows.length;i++){
