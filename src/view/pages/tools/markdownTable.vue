@@ -44,7 +44,7 @@
 	  data () {
 		  return{
 			  input_src:"",
-			  output_table:[],
+			  output_table:"",
 		  }
 	  },
     mounted(){
