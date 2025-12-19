@@ -51,25 +51,36 @@ axios.interceptors.request.use(config => {
 
 // http response 拦截器
 axios.interceptors.response.use(response => {
-  return Promise.resolve(response)
-} , error => {
-  if (!error.response) {
-  } else if (error.response.status === 404) {
-  } else if (error.response.status === 401) {
-    Message({
-      message: "用户登录失效, 请退出重新登录",
-      type: "warning"
-    })
-    store.dispatch("setToken", null)
-    Cookies.remove("access_token")
-    router.push("/login")
-  } else if (error.response.status === 403) {
+  if(response.data.code==403){
     Message({
       message: "用户没有访问页面权限",
       type: "warning"
     })
-    store.dispatch("setToken", null)
-    Cookies.remove("access_token")
+  }else if(response.data.code==401){
+    Message({
+      message: "用户登录失效, 请退出重新登录",
+      type: "warning"
+    })
+    store.dispatch("user/logout")
+    router.push("/login")
+  }else{
+    return Promise.resolve(response)
+  }
+} , error => {
+  if (!error.response) {
+  } else if (error.response.code === 404) {
+  } else if (error.response.code === 401) {
+    Message({
+      message: "用户登录失效, 请退出重新登录",
+      type: "warning"
+    })
+    store.dispatch("user/logout")
+    router.push("/login")
+  } else if (error.response.code === 403) {
+    Message({
+      message: "用户没有访问页面权限",
+      type: "warning"
+    })
   } else {
   }
   return Promise.reject(error.response) // 返回接口返回的错误信息

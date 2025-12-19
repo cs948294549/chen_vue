@@ -73,6 +73,7 @@
 
 
     <el-drawer :title="'【'+role_name+'】页面权限'" :visible.sync="dialog_page_flag" :direction="'rtl'" size="60%" destroy-on-close>
+      <p v-if="role_name=='system'">系统管理不需要添加页面，默认管理所有</p>
       <Card_page
         style="margin: 10px;"
         v-if="dialog_page_flag"

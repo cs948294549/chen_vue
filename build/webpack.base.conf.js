@@ -3,24 +3,26 @@ const path = require('path')
 const utils = require('./utils')
 const config = require('../config')
 const vueLoaderConfig = require('./vue-loader.conf')
+const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin')
+// 1. 引入新版 ESLint 插件
+const ESLintWebpackPlugin = require('eslint-webpack-plugin')
+const VueLoaderPlugin = require('vue-loader/lib/plugin')
+const MiniCssExtractPlugin = require('mini-css-extract-plugin')
+
 
 function resolve (dir) {
   return path.join(__dirname, '..', dir)
 }
 
-const createLintingRule = () => ({
-  test: /\.(js|vue)$/,
-  loader: 'eslint-loader',
-  enforce: 'pre',
-  include: [resolve('src'), resolve('test')],
-  options: {
-    formatter: require('eslint-friendly-formatter'),
-    emitWarning: !config.dev.showEslintErrorsInOverlay
-  }
-})
-
 module.exports = {
   context: path.resolve(__dirname, '../'),
+  plugins:[
+    new VueLoaderPlugin(),
+    new MonacoWebpackPlugin({
+      languages: ['python', 'javascript', 'json', 'html', 'css'],
+      features: ['coreCommands', 'find', 'contextmenu', 'hover', 'inlayHints']
+    }),
+  ],
   entry: {
     app: './src/main.js'
   },
@@ -32,7 +34,7 @@ module.exports = {
       : config.dev.assetsPublicPath
   },
   resolve: {
-    extensions: ['.js', '.vue', '.json', '.scss'],
+    extensions: ['.js', '.vue', '.json'],
     alias: {
       'vue$': 'vue/dist/vue.esm.js',
       '@': resolve('src'),
@@ -40,7 +42,6 @@ module.exports = {
   },
   module: {
     rules: [
-      ...(config.dev.useEslint ? [createLintingRule()] : []),
       {
         test: /\.vue$/,
         loader: 'vue-loader',
@@ -49,7 +50,8 @@ module.exports = {
       {
         test: /\.js$/,
         loader: 'babel-loader',
-        include: [resolve('src'), resolve('test'), resolve('node_modules/webpack-dev-server/client')]
+        include: [resolve('src'), resolve('test')],
+        exclude: /(node_modules)/
       },
       {
         test: /\.(png|jpe?g|gif|svg)(\?.*)?$/,
@@ -75,14 +77,16 @@ module.exports = {
           name: utils.assetsPath('fonts/[name].[hash:7].[ext]')
         }
       },
-      // 添加 Sass/SCSS 处理规则（关键配置）
       {
-        test: /\.s[ac]ss$/,  // 匹配 .scss 和 .sass 文件
-        use: [
-          'vue-style-loader',  // 将样式注入到 Vue 组件
-          'css-loader',        // 解析 CSS
-          'sass-loader'        // 解析 Sass/SCSS（依赖 sass）
-        ]
+        test: /\.sass$/,
+        use: [process.env.NODE_ENV === 'production' ? MiniCssExtractPlugin.loader : 'style-loader', {
+          loader: 'css-loader',
+          options: {
+            sourceMap: true
+          },
+        }, "sass-loader"],
+        include: [resolve('src'), resolve('test')],
+        exclude: /(node_modules)/,
       }
     ]
 

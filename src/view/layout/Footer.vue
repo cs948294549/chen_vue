@@ -16,7 +16,7 @@ export default {
   justify-content: center;
   background-color: #333;
   color: white;
-  padding: 10px;
+  /* padding: 10px; */
   width: 100%;
 }
 </style>
