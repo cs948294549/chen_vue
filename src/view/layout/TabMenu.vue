@@ -48,9 +48,14 @@ export default {
       this.activebreadcrumb=route["breadcrumbs"]
     },
     closeTab(item, idx){
-      if(idx>0){
+      if(this.activeTabId==item["path"]){
+        if(idx>0){
+          this.$store.dispatch("tabnav/removeTab", item)
+          this.switchTab(this.$store.getters['tabnav/tabnavBox'][idx-1]["path"])
+          this.activebreadcrumb=this.$store.getters['tabnav/tabnavBox'][idx-1]["breadcrumbs"]
+        }
+      }else{
         this.$store.dispatch("tabnav/removeTab", item)
-        this.switchTab(this.$store.getters['tabnav/tabnavBox'][idx-1]["path"])
       }
     }
   }

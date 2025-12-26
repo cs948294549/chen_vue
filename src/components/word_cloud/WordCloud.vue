@@ -52,7 +52,7 @@ export default {
     /** 词汇旋转比例（0-1，0 表示不旋转） */
     rotateRatio: {
       type: Number,
-      default: 0.3
+      default: 0.5
     },
     /** 词汇间距（单位：px） */
     padding: {
@@ -141,13 +141,17 @@ export default {
       const wordList = this.words.map(item => [item.text, item.weight]);
 
       // 词云配置项
+      // circle(圆形) cardioid(心形) diamond(菱形) triangle(三角形) star (星形)
       const options = {
+        // shape: 'triangle',
         list: wordList,
         fontFamily: this.fontFamily,
         minSize: this.fontSizeRange[0],
         maxSize: this.fontSizeRange[1],
+        // 禁用默认旋转比例（必须设为 0，避免冲突）
         rotateRatio: this.rotateRatio,
         padding: this.padding,
+        gridSize: 10,
         // 自定义颜色逻辑
         color: (word) => {
           return this.getWordColor(word);
@@ -184,6 +188,7 @@ export default {
           this.$emit('word-click', wordInfo);
         }
       };
+
 
       // 初始化词云实例
       this.wordCloudInstance = WordCloud(container, options);
