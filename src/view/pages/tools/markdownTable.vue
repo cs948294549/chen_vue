@@ -1,5 +1,5 @@
+<!--文本工具-->
 <template>
-  <!--前缀融合工具-->
 	<div style="display: flex;overflow: auto;">
 		<div style="width: 400px;height: 700px;">
       <span>markdown表格</span>
@@ -55,7 +55,7 @@
         if(rows.length<=1){
           rows= this.input_src.replace(/^\s*|\s*$/g,"").split("\\n")
         }
-        
+
         let headers = []
         let tables = []
         for(let i=0;i<rows.length;i++){

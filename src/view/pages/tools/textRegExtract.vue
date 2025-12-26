@@ -1,5 +1,5 @@
+<!--文本工具-->
 <template>
-  <!--文本提取工具-->
   <div>
     <div style="display: flex;margin: 10px;width: 800px;">
       <el-tag type="success" @click="change_reg(1)">身份证</el-tag>
