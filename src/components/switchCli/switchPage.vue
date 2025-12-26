@@ -49,7 +49,6 @@ export default {
     }
   },
   beforeDestroy() {
-    console.log("销毁===")
     if (this.editor) {
       this.editor.dispose();
     }

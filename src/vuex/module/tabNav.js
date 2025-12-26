@@ -11,7 +11,8 @@ const mutations = {
     if (state.tabnavBox[0] && state.tabnavBox[0].title !== "主页") {
       state.tabnavBox.unshift({
         title: "主页",
-        path: ""
+        path: "",
+        breadcrumbs: []
       })
     }
     for (let i = 0; i < state.tabnavBox.length; i++) {
@@ -21,11 +22,30 @@ const mutations = {
     }
     state.tabnavBox.push({
       title: tab.title,
-      path: tab.path
+      path: tab.path,
+      breadcrumbs: tab.breadcrumbs
     })
   },
   clearTab (state, tab){
-    state.tabnavBox=[{title: "主页",path: ""}]
+    state.tabnavBox=[{title: "主页",path: "", breadcrumbs: []}]
+  },
+  removeTab (state, tab){
+    let idx = 0;
+    for (let i = 0; i < state.tabnavBox.length; i++) {
+      if (state.tabnavBox[i].path === tab.path) {
+        idx = i;
+        break
+      }
+    }
+    state.tabnavBox.splice(idx,1)
+
+    if (state.tabnavBox[0] && state.tabnavBox[0].title !== "主页") {
+      state.tabnavBox.unshift({
+        title: "主页",
+        path: ""
+      })
+    }
+
   }
 }
 
@@ -36,6 +56,9 @@ const actions = {
   },
   clearTab ({commit}, arg) {
     commit("clearTab", arg)
+  },
+  removeTab ({commit}, arg) {
+    commit("removeTab", arg)
   },
 }
 

@@ -79,18 +79,27 @@ export default {
       // console.log("选中===",index, index_path)
       let matched = false
       let navTitle=""
+      let breadcrumbs = []
       for(let i=0;i<this.route_list.length;i++){
         if(this.route_list[i]["children"].length>0){
+          breadcrumbs = []
+          breadcrumbs.push(this.route_list[i]["group"])
+          breadcrumbs.push(this.route_list[i]["name"])
+
           for(let j=0;j<this.route_list[i]["children"].length;j++){
             if(this.route_list[i]["children"][j]["path"]==index){
               navTitle=this.route_list[i]["children"][j]["name"]
+              breadcrumbs.push(navTitle)
               matched=true
               break
             }
           }
         }else{
+          breadcrumbs = []
+          breadcrumbs.push(this.route_list[i]["group"])
           if(this.route_list[i]["path"]==index){
             navTitle=this.route_list[i]["name"]
+            breadcrumbs.push(navTitle)
             matched=true
           }
         }
@@ -98,9 +107,9 @@ export default {
           break
         }
       }
-      this.$store.dispatch("tabnav/addTab",{"title":navTitle,"path":index})
-      this.$router.push({path:'/'+index, query:{}});
-
+      this.$store.dispatch("tabnav/addTab",{"title":navTitle,"path":'/'+index,'breadcrumbs':breadcrumbs})
+      // this.$router.push({path:'/'+index, query:{}});
+      this.$emit('changeMenu', {"title":navTitle,"path":'/'+index,'breadcrumbs':breadcrumbs});
     },
   },
   components: {}

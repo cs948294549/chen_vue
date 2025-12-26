@@ -2,9 +2,9 @@
   <div style="display: flex;flex-direction: column;">
     <TopMenu ref="top_menu" @changeGroup="changeGroupItem" />
     <div style="display: flex;min-height: 100vh;">
-      <SideMenu ref="side_menu" />
+      <SideMenu ref="side_menu" @changeMenu="changeTab" />
       <div style="flex: 1;margin: 10px;">
-        <TabMenu style="padding-bottom: 10px;border-bottom: 1px solid #eee;"></TabMenu>
+        <TabMenu ref="tab_nav" style="padding-bottom: 10px;border-bottom: 1px solid #eee;"></TabMenu>
         <!-- 这里是页面的主要内容区域 -->
         <transition name="main" mode="out-in">
           <!-- <el-card> -->
@@ -34,6 +34,9 @@ export default {
     changeGroupItem(g_str){
       this.$refs.side_menu.reloadRoute(this.$store.state.allMenu.menuList, g_str)
     },
+    changeTab(route){
+      this.$refs.tab_nav.changeTab(route)
+    }
   },
   components: {
     TopMenu,
