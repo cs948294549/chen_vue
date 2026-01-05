@@ -2,7 +2,7 @@
 // 顶上快捷标签栏目
 const state = {
   //默认菜单
-  tabnavBox: [{title: "主页",path: ""}],
+  tabnavBox: [{title: "主页",path: "/pages/index"}],
 }
 
 // 修改状态的方法
@@ -11,7 +11,7 @@ const mutations = {
     if (state.tabnavBox[0] && state.tabnavBox[0].title !== "主页") {
       state.tabnavBox.unshift({
         title: "主页",
-        path: "",
+        path: "/pages/index",
         breadcrumbs: []
       })
     }
@@ -27,7 +27,7 @@ const mutations = {
     })
   },
   clearTab (state, tab){
-    state.tabnavBox=[{title: "主页",path: "", breadcrumbs: []}]
+    state.tabnavBox=[{title: "主页",path: "/pages/index", breadcrumbs: []}]
   },
   removeTab (state, tab){
     let idx = 0;
@@ -42,7 +42,7 @@ const mutations = {
     if (state.tabnavBox[0] && state.tabnavBox[0].title !== "主页") {
       state.tabnavBox.unshift({
         title: "主页",
-        path: ""
+        path: "/pages/index",
       })
     }
 

@@ -91,7 +91,9 @@ export default {
         if(classic.indexOf(route[i]["group"])>-1){
 
         }else{
-          classic.push(route[i]["group"])
+          if(route[i]["group"]!==""){
+            classic.push(route[i]["group"])
+          }
         }
       }
       this.classic = classic
