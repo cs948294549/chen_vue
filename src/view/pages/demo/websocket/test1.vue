@@ -6,7 +6,7 @@
 </template>
 
 <script>
-import op_api from "@/api/mapis/image_interface.js"
+import op_api from "@/api/mapis/1demo_interface.js"
 
 export default {
   name: "TopMenu",

@@ -1,7 +1,7 @@
 <template>
   <div style="display: flex;flex-direction: column;">
     <TopMenu ref="top_menu" @changeGroup="changeGroupItem" />
-    <div style="display: flex;min-height: 100vh;">
+    <div style="display: flex;max-height: 100vh;">
       <SideMenu ref="side_menu" @changeMenu="changeTab" />
       <div style="flex: 1;margin: 10px;">
         <TabMenu ref="tab_nav" style="padding-bottom: 10px;border-bottom: 1px solid #eee;"></TabMenu>

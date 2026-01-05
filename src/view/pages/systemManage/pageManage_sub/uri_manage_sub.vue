@@ -37,7 +37,7 @@
         </el-table>
       </div>
     </div>
-    <el-dialog title="创建角色" :visible.sync="diag_flag" width="50%" append-to-body>
+    <el-dialog title="新增接口" :visible.sync="diag_flag" width="50%" append-to-body>
       <el-form v-model="feature_uri" size="mini" label-width="80px">
         <el-form-item label="页面ID">
           <el-input style="width: 500px;" placeholder="页面ID" v-model="feature_uri.page_id" disabled readonly></el-input>

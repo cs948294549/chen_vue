@@ -52,7 +52,7 @@ export default {
     /** 词汇旋转比例（0-1，0 表示不旋转） */
     rotateRatio: {
       type: Number,
-      default: 0.5
+      default: 0
     },
     /** 词汇间距（单位：px） */
     padding: {
@@ -143,7 +143,7 @@ export default {
       // 词云配置项
       // circle(圆形) cardioid(心形) diamond(菱形) triangle(三角形) star (星形)
       const options = {
-        // shape: 'triangle',
+        shape: 'circle',
         list: wordList,
         fontFamily: this.fontFamily,
         minSize: this.fontSizeRange[0],
