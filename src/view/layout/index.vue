@@ -27,8 +27,12 @@ import TabMenu from "./TabMenu.vue"
 export default {
   name: "App",
   mounted () {
-    this.$refs.side_menu.reloadRoute(this.$store.state.allMenu.menuList)
-    this.$refs.top_menu.reloadRoute(this.$store.state.allMenu.menuList)
+    const menuList = this.$store.state.allMenu.menuList;
+
+    this.$refs.top_menu.reloadRoute(menuList, (g_name) => {
+    // 该回调函数会在 top_menu.reloadRoute 执行完成后触发
+      this.$refs.side_menu.reloadRoute(menuList, g_name);
+    })
   },
   methods:{
     changeGroupItem(g_str){

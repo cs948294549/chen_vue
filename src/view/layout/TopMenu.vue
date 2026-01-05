@@ -84,21 +84,33 @@ export default {
     // console.log("当前url==",JSON.stringify(this.$store.getters["tabnav/tabnavBox"]))
   },
   methods: {
-    reloadRoute (route){
-      this.refresh_flag = false
-      let classic = []
-      for(let i=0;i<route.length;i++){
-        if(classic.indexOf(route[i]["group"])>-1){
-
-        }else{
-          if(route[i]["group"]!==""){
-            classic.push(route[i]["group"])
+    reloadRoute (route, callback){
+      try{
+        this.refresh_flag = false
+        let classic = []
+        for(let i=0;i<route.length;i++){
+          if(classic.indexOf(route[i]["group"])>-1){
+        
+          }else{
+            if(route[i]["group"]!==""){
+              classic.push(route[i]["group"])
+            }
           }
         }
+        this.classic = classic
+        this.activeName = classic[0]
+        this.refresh_flag = true
+        // 关键：逻辑执行完成后，调用回调函数（若传入）
+        if (typeof callback === 'function') {
+          callback(this.activeName);
+        }
+      }catch (error) {
+        console.error('top_menu reloadRoute 执行失败：', error);
+        // 异常时也可调用回调（可选，根据业务需求决定）
+        if (typeof callback === 'function') {
+          callback();
+        }
       }
-      this.classic = classic
-      this.activeName = classic[0]
-      this.refresh_flag = true
     },
     changeGroup(g_str){
       this.activeName = g_str
