@@ -12,7 +12,7 @@ const state = {
     }
   ],
   padding_route: {
-    name: "告警中心",
+    name: "uuuuu",
     item: {"id":"x-101","name":"历史告警","group":"","order":"99","path":"pages/alarms/history_alarm","hide":false,"children":[]}
   },
 
