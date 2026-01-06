@@ -36,7 +36,7 @@ export default {
   getMergelist (data, params) {
     return axios.post("/alarm/get_mergelist", data, params)
   },
-  
+
   //告警相关接口
   getCurrentAlarm (data, params) {
     return axios.post("/alarm/get_current_alarm", data, params)
@@ -50,6 +50,14 @@ export default {
   getAlarmLog (data, params) {
     return axios.post("/alarm/get_alarm_log", data, params)
   },
-  
-  
+  getHistoryAlarm (data, params) {
+    return axios.post("/alarm/get_history_alarm", data, params)
+  },
+  getLogByGroup (data, params) {
+    return axios.post("/alarm/get_log_by_group", data, params)
+  },
+
+
+
+
 }

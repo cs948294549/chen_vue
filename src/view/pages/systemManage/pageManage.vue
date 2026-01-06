@@ -1,5 +1,5 @@
 <template>
-  <div style="margin: 10px;">
+  <div style="margin: 10px;max-height: 700px;overflow-y: auto;overflow-x: hidden;">
     <el-button type="primary" icon="el-icon-circle-plus-outline" size="small" @click="dialogVisible=true;editForm={}" plain style="margin-bottom: 10px">添加菜单</el-button>
     <el-table :data="routerTableData" row-key="page_id" :tree-props="{children: 'children'}" @selection-change="handleSelectionChange" size="mini">
       <!-- <el-table-column type='selection' width='50'></el-table-column> -->

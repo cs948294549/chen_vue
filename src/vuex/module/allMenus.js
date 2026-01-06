@@ -9,27 +9,12 @@ const state = {
     },
     {
       "id": "id-901", "name": "页面管理", "group": "系统管理", "order": "401", "path":"pages/systemManage/pageManage", "hide":false, "children": [],
-    },
-
-
-    //demo列表
-    {
-      "id":100,"name":"测试页面","group":"demo","order":"300","path":"","hide":false,"children":[
-        {"id":101,"name":"拖动","group":"","order":"5","path":"pages/demo/drag/dragParent","hide":false,"children":[]},
-        {"id":102,"name":"G6流程图","group":"","order":"6","path":"pages/demo/workflow/g6_flow","hide":false,"children":[]},
-        {"id":103,"name":"图片框选", "group":"","order":"3","path":"pages/demo/images/test6","hide":false,"children":[]},
-        {"id":104,"name":"WebSocket测试", "group":"","order":"1","path":"pages/demo/websocket/test1","hide":false,"children":[]},
-        {"id":105,"name":"词云测试", "group":"","order":"1","path":"pages/demo/wordcloud/word_main","hide":false,"children":[]},
-        {"id":106,"name":"旭日图测试", "group":"","order":"1","path":"pages/demo/antvg2/test2","hide":false,"children":[]},
-      ]
-    },
-    {
-      "id": 1, "name": "图片处理", "group": "分组1", "order": "100", "path": "", "hide":false, "children": [
-        {"id":3,"name":"去除文字", "group":"","order":"2","path":"pages/test2","hide":false,"children":[]}
-      ],
-    },
-
+    }
   ],
+  padding_route: {
+    name: "告警中心",
+    item: {"id":"x-101","name":"历史告警","group":"","order":"99","path":"pages/alarms/history_alarm","hide":false,"children":[]}
+  },
 
   //view为基础目录
   menuList: [
@@ -48,6 +33,8 @@ const mutations = {
 const actions = {
   fetchRoute (context, routes) {
     // console.log("获取路由信息=开始解析==", routes)
+    let padding_route = context.state.padding_route
+    // console.log("===", padding_route)
     const route_list = []
     for(let i=0;i<routes.length;i++){
       let _r = {
@@ -72,6 +59,9 @@ const actions = {
           "children":[],
         }
         _r["children"].push(_r_c)
+      }
+      if(_r["name"]===padding_route["name"]){
+        _r["children"].push(padding_route["item"])
       }
       route_list.push(_r)
     }

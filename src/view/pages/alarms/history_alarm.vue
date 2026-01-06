@@ -1,10 +1,57 @@
 <template>
   <div class="parent-nested-page">
+    <!-- 搜索菜单栏 -->
+    <div>
+      <el-row>
+        <el-form style="text-align: right; margin-right: 5px;" size="mini" :inline="true">
+          <el-form-item label="设备IP">
+            <el-input placeholder="设备IP" v-model="filter_ip" @keyup.enter.native="searchKey" clearable></el-input>
+          </el-form-item>
+          <el-form-item label="设备名">
+            <el-input placeholder="设备名" v-model="filter_hostname" @keyup.enter.native="searchKey" clearable></el-input>
+          </el-form-item>
+          <el-form-item label="告警对象">
+            <el-input placeholder="告警对象" v-model="filter_object" @keyup.enter.native="searchKey" clearable></el-input>
+          </el-form-item>
+          <el-form-item label="关键字">
+            <el-input placeholder="关键字" v-model="filter_keyword" @keyup.enter.native="searchKey" clearable></el-input>
+          </el-form-item>
+        </el-form>
+      </el-row>
+      <el-row>
+        <el-form style="text-align: right; margin-right: 5px;" size="mini" :inline="true">
+          <el-form-item label="开始时间">
+            <el-date-picker
+              v-model="filter_start_time"
+              type="datetime"
+              placeholder="选择日期时间"
+              align="right"
+              format="yyyy年MM月dd HH:mm:ss"
+              value-format="timestamp"
+              :picker-options="pickerOptions">
+            </el-date-picker>
+          </el-form-item>
+          <el-form-item label="结束时间">
+            <el-date-picker
+              v-model="filter_end_time"
+              type="datetime"
+              placeholder="选择日期时间"
+              align="right"
+              format="yyyy年MM月dd HH:mm:ss"
+              value-format="timestamp"
+              :picker-options="pickerOptions">
+            </el-date-picker>
+          </el-form-item>
+
+          <el-form-item>
+            <el-button type="primary" :loading="isload" @click="searchKey">筛选</el-button>
+          </el-form-item>
+        </el-form>
+      </el-row>
+    </div>
     <!-- 新增：操作按钮栏（全局，用于批量处理所有日志） -->
     <div class="global-operation-bar">
-      <el-button type="primary" @click="handle_syslog" size="mini">处理选中告警</el-button>
-      <el-button type="success" :loading="isload" @click="extractLog" size="mini">导出日志数据</el-button>
-      <el-button type="success" @click="fresh_alarm" size="mini">刷新</el-button>
+      <el-button type="success" @click="extractLog" :loading="isload" size="mini">导出日志数据</el-button>
     </div>
     <!-- 引入嵌套折叠列表组件 -->
     <NestedCollapseAlarmList
@@ -17,7 +64,7 @@
       @bnt_event="handleEvent"
     />
     <!-- 加载中提示 -->
-    <div class="loading-tip" v-else>暂无告警</div>
+    <div class="loading-tip" v-else>暂无数据</div>
 
     <el-dialog title="查看详情" :visible.sync="diag_detail_show" width="60%" append-to-body>
       <!-- 引入日志展示组件，传入日志数据 -->
@@ -28,25 +75,16 @@
       />
     </el-dialog>
 
-    <el-dialog title="处理告警" width="50%" :visible.sync="diag_handle_show" destroy-on-close :close-on-click-modal="false" append-to-body>
-      <el-form label-width="100px" ref="handle_form" :model="handle_feature">
-        <el-form-item label="告警类型数量" prop="counter">
-          <el-input style="width: 500px;" placeholder="告警类型数量" v-model="handle_feature.counter" disabled readonly></el-input>
-        </el-form-item>
-        <el-form-item label="类型" prop="p_type">
-          <el-select v-model="handle_feature.status" placeholder="请选择类型">
-            <el-option v-for="item in typeOptions" :key="item.value" :label="item.label" :value="item.value"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="描述信息">
-          <el-input v-model="handle_feature.descr"></el-input>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="isload" @click="submitHandleForm" size="small">确定</el-button>
-          <el-button type="info" @click="diag_handle_show=false" size="small">取消</el-button>
-        </el-form-item>
-      </el-form>
+    <el-dialog title="查看详情" :visible.sync="diag_handle_show" width="60%" append-to-body>
+      <!-- 引入日志展示组件，传入日志数据 -->
+      <HandleLogDisplay
+        :log-data="handleLogData"
+        card-title="运维操作日志"
+        container-height="700px"
+      />
     </el-dialog>
+
+
 
 
   </div>
@@ -57,117 +95,85 @@
 import NestedCollapseAlarmList from './alarm_sub/NestedCollapseAlarmList.vue';
 // 引入日志展示组件
 import LogDisplay from './alarm_sub/LogDisplay.vue';
+import HandleLogDisplay from './alarm_sub/HandleLogDisplay.vue';
 import alarm_api from "@/api/mapis/alarm_interface.js"
 import { downloadFile } from '@/utils/downloadUtil';
 
 export default {
   name: 'ParentNestedAlarm',
   components: {
-    NestedCollapseAlarmList,LogDisplay
+    NestedCollapseAlarmList,LogDisplay,HandleLogDisplay
   },
   data() {
     return {
-      // 定时器实例（必须保存，用于后续销毁）
-      updateTimer: null,
+      //时间选择器选项
+      pickerOptions: {
+        shortcuts: [{
+          text: '此刻',
+          onClick(picker) {
+            picker.$emit('pick', new Date());
+          }
+        },{
+          text: '1小时前',
+          onClick(picker) {
+            const date = new Date();
+            date.setTime(date.getTime() - 3600 * 1000 * 1);
+            picker.$emit('pick', date);
+          }
+        }, {
+          text: '3小时前',
+          onClick(picker) {
+            const date = new Date();
+            date.setTime(date.getTime() - 3600 * 1000 * 3);
+            picker.$emit('pick', date);
+          }
+        }]
+      },
+
 
 
       diag_detail_show:false,
+      diag_handle_show:false,
       // 核心：折叠状态缓存对象（{ "ip地址": 折叠状态, ... }）
       collapsedStateCache: {},
 
-      serverLogData: [
-        {
-          msg: "2026-01-04 10:00:00 [INFO] 系统启动成功，端口：8080",
-          status: 1
-        },
-        {
-          msg: "2026-01-04 10:05:00 [WARN] 数据库连接池剩余连接数不足：5/100",
-          status: 0
-        },
-        {
-          msg: "2026-01-04 10:10:00 [ERROR] 用户登录失败，用户名：admin，错误信息：密码错误",
-          status: 0
-        }
-      ],
+      //日志详情
+      serverLogData: [],
+      //操作历史记录
+      handleLogData: [],
       // 符合要求的嵌套式告警数据（可直接替换为接口返回数据）
-      nestedAlarmListData: [
-        {
-          "ip": "3.3.3.3",
-          "hostname": "NHZ04_M02_S125_FN_CSW1.S",
-          "children": [
-            {
-              "group_label": "e02bc7d5c2cf985f487cf1ca24360e14",
-              "alarm_type": "syslog",
-              "group_name": "up/down状态",
-              "alarm_object": "Vlan-interface11",
-              "keyword": "IFNET/5/LINK_UPDOWN",
-              "counter": 20,
-              "start_time": 1767495421,
-              "end_time": 1767495431
-            }
-          ]
-        },
-        {
-          "ip": "4.4.4.4",
-          "hostname": "NHZ04_M02_S125_FN_CSW2.S",
-          "children": [
-            {
-              "group_label": "1234567890abcdef1234567890abcdef",
-              "alarm_type": "metric",
-              "group_name": "CPU使用率过高",
-              "alarm_object": "CPU 0",
-              "keyword": "CPU_USAGE/HIGH",
-              "counter": 5,
-              "start_time": 1767495500,
-              "end_time": 1767495600
-            }
-          ]
-        }
-      ],
+      nestedAlarmListData: [],
 
       alarmMenu:[
         {"name": "show_detail",'icon':"el-icon-view",'type':"primary"},
+        {"name": "show_handle",'icon':"el-icon-tickets",'type':"info"},
       ],
 
 
       isload:false,
-      hanld_cache:"",
-      diag_handle_show:false,
-      handle_feature:{},
-      typeOptions:[{"label":"确认", "value": 1},{"label":"忽略", "value": 2},{"label":"屏蔽", "value": 3}]
+      hanld_cache:[],
+
+
+      //筛选条件变量
+      filter_ip:"",
+      filter_hostname:"",
+      filter_object:"",
+      filter_keyword:"",
+      filter_start_time:"",
+      filter_end_time:"",
+
+
 
     };
   },
   created() {
     // 1. 组件创建时，初始化定时任务（每 30 秒执行一次）
-    this.initUpdateTimer();
+    // this.initUpdateTimer();
   },
   mounted() {
-    this.fresh_alarm();
+    // this.fresh_alarm();
   },
   methods:{
-    /**
-     * 初始化 30 秒定时更新定时器
-     */
-    initUpdateTimer() {
-      // 先清理已有定时器（避免重复创建）
-      this.clearUpdateTimer();
-
-      // 2. 创建定时任务，每 30000 毫秒（30 秒）执行一次 fetchDataUpdate
-      this.updateTimer = setInterval(() => {
-        this.fresh_alarm();
-      }, 30000); // 30 * 1000 = 30000 毫秒
-    },
-
-    /**
-     * 清理定时任务
-     */
-    clearUpdateTimer() {
-      if (this.updateTimer) {
-        clearInterval(this.updateTimer);
-        this.updateTimer = null; // 重置定时器实例，避免残留
-      }
-    },
     /**
      * 处理子组件上报的折叠状态变化（核心事件处理方法）
      * @param {Object} payload 子组件传递的载荷对象 { ip, isExpanded }
@@ -196,7 +202,31 @@ export default {
     handleEvent(key, data){
       if(key=="show_detail"){
         this.showDetail(data)
+      }else if(key=="show_handle"){
+        this.getHistoryHandle(data)
       }
+    },
+    getHistoryHandle(item){
+      console.log("查询历史操作", item)
+      let that = this
+      alarm_api.getAlarmLog({"group_label": item["group_label"]},{}).then(function (response) {
+        // console.log("handle===",response.data)
+        if(response.data.code==0){
+          // that.nestedAlarmListData=response.data["data"]
+          that.handleLogData=response.data["data"]
+          that.diag_handle_show=true
+        }else{
+          that.$message({
+            type: 'error',
+            message: '查询失败，请重试'+response.data.message
+          });
+        }
+      })
+      .catch(function (error) {
+        console.log(error)
+      })
+
+
     },
     showDetail(item){
       // console.log("查看日志详情==", item)
@@ -222,43 +252,46 @@ export default {
         console.log(error)
       })
     },
-    handle_syslog(){
-      this.$set(this.handle_feature, 'counter', this.hanld_cache.length)
-      this.diag_handle_show=true
-    },
-    submitHandleForm(){
-      // console.log("提交状态修改===", this.hanld_cache, this.handle_feature)
-      let that = this
-      let post_data = {}
-      post_data["group_labels"] = this.hanld_cache
-      post_data["handler"] = "chensong"
-      post_data["status"] = this.handle_feature["status"]
-      alarm_api.handleAlarmByGroup(post_data,{}).then(function (response) {
-        // console.log("handle log===",response.data)
-        if(response.data.code==0){
-          that.$message({
-            type: 'success',
-            message: '处理成功'
-          });
-          that.diag_handle_show=false
-          that.fresh_alarm()
-        }else{
-          that.$message({
-            type: 'error',
-            message: '处理失败，请重试'+response.data.message
-          });
-        }
-      })
-      .catch(function (error) {
-        console.log(error)
-      })
-    },
 
-    fresh_alarm(){
+    searchKey(){
       let that = this
       // this.nestedAlarmListData=[]
-      alarm_api.getCurrentAlarm({},{}).then(function (response) {
-        // console.log("current log===",response.data)
+      let post_data={
+        "start_time": parseInt(new Date().getTime()/1000-86400),
+        "end_time": parseInt(new Date().getTime()/1000),
+      }
+
+      this.filter_ip = this.filter_ip.replace(/^\s*|\s*$/g,"")
+      if(this.filter_ip!=""){
+        post_data["ip_reg"] = this.filter_ip
+      }
+
+      this.filter_hostname = this.filter_hostname.replace(/^\s*|\s*$/g,"")
+      if(this.filter_hostname!=""){
+        post_data["hostname_reg"] = this.filter_hostname
+      }
+
+      this.filter_object = this.filter_object.replace(/^\s*|\s*$/g,"")
+      if(this.filter_object!=""){
+        post_data["alarm_object_reg"] = this.filter_object
+      }
+
+      this.filter_keyword = this.filter_keyword.replace(/^\s*|\s*$/g,"")
+      if(this.filter_keyword!=""){
+        post_data["keyword_reg"] = this.filter_keyword
+      }
+
+      if(this.filter_start_time){
+        post_data["start_time"]=parseInt(this.filter_start_time/1000)
+      }
+
+      if(this.filter_end_time){
+        post_data["end_time"]=parseInt(this.filter_end_time/1000)
+      }
+
+      this.isload=true
+      alarm_api.getHistoryAlarm(post_data,{}).then(function (response) {
+        console.log("history log===",response.data)
         if(response.data.code==0){
           // that.nestedAlarmListData=response.data["data"]
           // 关键：保留数组引用，仅清空内容并添加新数据（避免子组件整体重渲染）
@@ -271,12 +304,13 @@ export default {
             message: '查询失败，请重试'+response.data.message
           });
         }
+        that.isload=false
       })
       .catch(function (error) {
         console.log(error)
+        that.isload=false
       })
     },
-
     extractLog(){
       // console.log("导出选中日志==", this.hanld_cache)
       let that = this
@@ -305,7 +339,6 @@ export default {
         console.log(error)
       })
     },
-
     getExportContent(alarm_datas){
       const device_log = {}
       alarm_datas.forEach((log, index) => {
@@ -340,7 +373,7 @@ export default {
 
       // 3. 调用下载工具函数
       downloadFile(exportContent, fileName, 'text/plain');
-    }
+    },
 
 
   },

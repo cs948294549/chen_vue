@@ -1,5 +1,5 @@
 <template>
-  <div style="margin: 10px;">
+  <div style="margin: 10px;max-height: 700px;overflow-y: auto;overflow-x: hidden;">
     <el-tabs v-model="activeName" @tab-click="handleClick">
       <el-tab-pane label="用户管理" name="1">
         <Card_user v-if="activeName=='1'" ></Card_user>

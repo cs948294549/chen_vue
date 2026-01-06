@@ -5,7 +5,7 @@
       <li
         class="outer-list-item"
         v-for="(outerItem, outerIndex) in formattedOuterList"
-        :key="outerItem.ip || outerIndex"
+        :key="outerItem.ip+outerItem.hostname || outerIndex"
         v-if="outerItem"
       >
         <!-- 外层表层（多选框、IP、设备名、折叠按钮） -->
@@ -79,7 +79,13 @@
                 </div>
                 <div class="inner-detail-row">
                   <span class="detail-label">菜单：</span>
-                  <el-button type="primary" icon="el-icon-view" size="mini" @click="show_detail(innerItem)" circle></el-button>
+                  <el-button
+                    v-for="(menu_item, menu_idx) in menuList"
+                    :type="menu_item['type']?menu_item['type']:'primary'"
+                    :icon="menu_item['icon']" size="mini"
+                    :key="menu_item['name']"
+                    @click="submit_action(menu_item['name'],innerItem)" circle></el-button>
+                  <!-- <el-button type="primary" icon="el-icon-view" size="mini" @click="show_detail(innerItem)" circle></el-button> -->
                 </div>
               </div>
             </li>
@@ -121,6 +127,16 @@ export default {
     collapsedStateCache: {
       type: Object,
       default: () => ({})
+    },
+    //自定义菜单
+    menuList:{
+      type: Array,
+      default: () => ([]),
+      validator: (value) => {
+        // 兼容空数组，非空时校验外层核心字段
+        if (value.length === 0) return true;
+        return value.every(item => item.hasOwnProperty('icon') && item.hasOwnProperty('name'));
+      }
     }
   },
   data() {
@@ -322,9 +338,8 @@ export default {
       this.$emit('all-select-change', allSelected);
     },
 
-    //查看详情
-    show_detail(item){
-      this.$emit('show-item', item);
+    submit_action(key, data){
+      this.$emit('bnt_event', key, data);
     },
   }
 };
