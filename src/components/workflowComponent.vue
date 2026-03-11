@@ -100,12 +100,17 @@
         init_cfg:{
         	// ... 其他G6原生入参
         	// 所有节点默认配置
+          // 初始缩放比例（不再被fitView覆盖）
+          zoom: this.initZoom,
+          // 缩放范围限制
+          minZoom: 0.3,
+          maxZoom: 2,
         	defaultNode: {
         	  type:  'modelRect-node',
         	  style: {
-        	    radius: 10,
-        	    width:  200,
-        	    height: 80,
+        	    radius: 6,
+        	    width:  100,
+        	    height: 40,
         	    cursor: 'pointer',
         	    fill:   '#fff',
         	  },
@@ -215,8 +220,8 @@
       	  modes: {
       	    // 支持的 behavior
       		// default:    ['zoom-canvas', 'drag-node'],
-      	    default:    ['drag-canvas','drag-shadow-node', 'zoom-canvas','canvas-event', 'select-node', 'hover-node', 'active-edge', 'delete-item'],
-      	    readonly: ['drag-canvas', 'zoom-canvas', 'drag-shadow-node', 'active-edge', 'select-node',],
+      	    default:    ['drag-canvas','drag-shadow-node', 'canvas-event', 'select-node', 'hover-node', 'active-edge', 'delete-item'],
+      	    readonly: ['drag-canvas', 'drag-shadow-node', 'active-edge', 'select-node',],
       	  },
       	  plugins: [minimap],
       	}
@@ -435,19 +440,20 @@
                 show: true,
                 // icon 的地址，字符串类型
                 // img: "https://gw.alipayobjects.com/zos/basement_prod/4f81893c-1806-4de4-aff3-9a6b266bc8a2.svg",
-                img: this.logoSvgBase64,
+                // img: this.logoSvgBase64,
               },
               // 节点中表示状态的 icon 配置
               stateIcon: {
                 // 是否显示 icon，值为 false 则不渲染 icon
                 show: false,
                 // icon 的地址，字符串类型
-                img: this.logoSvgBase64,
+                // img: this.logoSvgBase64,
               },
               x: position.x,
               y: position.y
             }
           }
+          console.log("org node===", nodeItem)
           console.log("add node===", node)
           this.graph.addItem('node', node);
           this.nodes[node["id"]]=node

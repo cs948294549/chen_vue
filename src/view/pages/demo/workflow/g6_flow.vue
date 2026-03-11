@@ -89,7 +89,7 @@ export default {
       // 初始流程图数据
       initialData: {
         nodes: [
-          { node_id: 'start-1', type: 'start', node_label: '开始', color: '#409EFF', position:{x: 100, y: 200}, icon: 'el-icon-circle-check' },
+          { node_id: 'start-1', type: 'start', node_label: '开始', color: '#409EFF', position:{x: 100, y: 200}, icon: 'el-icon-circle-check',size: [50, 25], style: { fill: '#52c41a' } },
           { node_id: 'task-1', type: 'task', node_label: '数据处理', color: '#67C23A', position:{x: 300, y: 200}, icon: 'el-icon-s-operation' },
           { node_id: 'end-1', type: 'end', node_label: '结束', color: '#F56C6C', position:{x: 500, y: 200}, icon: 'el-icon-circle-close' }
         ],
