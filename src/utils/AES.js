@@ -1,5 +1,8 @@
 import crypto from 'crypto-js';
-const pk_secret="3a4b3ca0247e0500da70d637f6c5ded8"
+
+// 从环境变量读取AES密钥
+const pk_secret = process.env.AES_SECRET || "3a4b3ca0247e0500da70d637f6c5ded8"
+
 const AES = {
   // 加密
   passwd_encode(de_pass_str){

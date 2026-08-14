@@ -239,7 +239,8 @@ lmd5.b64_hmac_md5 = function (key, data) { return binl2b64(core_hmac_md5(key, da
 lmd5.str_hmac_md5 = function (key, data) { return binl2str(core_hmac_md5(key, data)); }
 
 
-const salt = "eyJhbGciOiJIUzI1NiIsIn"
+// 从环境变量读取MD5盐值
+const salt = process.env.MD5_SALT || "eyJhbGciOiJIUzI1NiIsIn"
 lmd5.salt_identify = function (s) { return lmd5.hex_md5(s+salt); }
 
 export default lmd5

@@ -10,9 +10,8 @@ axios.defaults.timeout = 1000000 // 超时时间
 
 axios.defaults.withCredentials = false
 
-// const server_port = "localhost:5000"
-// const server_port = "chen.test.com/api"
-const server_port = "47.98.235.241/api"
+// 从环境变量读取API地址
+const server_port = process.env.API_BASE_URL || "localhost:5000"
 
 const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
 
