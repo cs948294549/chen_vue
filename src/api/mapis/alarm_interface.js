@@ -57,7 +57,4 @@ export default {
     return axios.post("/alarm/get_log_by_group", data, params)
   },
 
-
-
-
 }
