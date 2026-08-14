@@ -2,15 +2,23 @@
 
 ## 快速部署
 
-### 1. 本地编译
+### 1. 配置部署脚本
+
+编辑 `deploy.sh` 文件，修改配置区域：
+
 ```bash
-npm run build
+# ===== 配置区域 =====
+REMOTE_USER="root"                    # 远程服务器用户名
+REMOTE_HOST="netops.vdian.net"        # 远程服务器地址
+REMOTE_PATH="/var/www/netops"         # 远程部署路径
+LOCAL_DIST="dist"                     # 本地编译目录
+BACKUP_DIR="/var/www/netops_backup"   # 远程备份目录
+# ===================
 ```
 
-### 2. 设置部署配置
+### 2. 本地编译
 ```bash
-export DEPLOY_HOST=netops.vdian.net    # 必需：远程服务器地址
-export DEPLOY_USER=root                # 可选：远程用户名，默认 root
+npm run build
 ```
 
 ### 3. 执行部署
@@ -106,24 +114,17 @@ export DEPLOY_HOST=netops.vdian.net
 ```
 
 ### 使用非 root 用户部署
+
+编辑 `deploy.sh`，修改 `REMOTE_USER`：
+
 ```bash
-export DEPLOY_HOST=netops.vdian.net
-export DEPLOY_USER=www-data
-./deploy.sh
+REMOTE_USER="www-data"
 ```
 
 ### 回滚到上一版本
 ```bash
-export DEPLOY_HOST=netops.vdian.net
 ./deploy.sh rollback
 ```
-
-## 环境变量
-
-| 变量名 | 必需 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `DEPLOY_HOST` | 是 | 无 | 远程服务器地址 |
-| `DEPLOY_USER` | 否 | `root` | 远程服务器用户名 |
 
 ## 脚本配置
 
@@ -213,11 +214,10 @@ Host netops
     IdentityFile ~/.ssh/id_rsa
 ```
 
-然后可以简化部署命令：
+然后可以在 `deploy.sh` 中使用简化的主机名：
 
 ```bash
-export DEPLOY_HOST=netops
-./deploy.sh
+REMOTE_HOST="netops"
 ```
 
 ## Nginx 配置参考
@@ -262,8 +262,6 @@ deploy:
   script:
     - npm install
     - npm run build
-    - export DEPLOY_HOST=$PRODUCTION_HOST
-    - export DEPLOY_USER=$PRODUCTION_USER
     - ./deploy.sh
   environment:
     name: production

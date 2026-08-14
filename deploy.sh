@@ -2,8 +2,8 @@
 
 ##############################################
 # NetOps 前端项目部署脚本
-# 用途：将本地编译的 dist 目录部署到线上服务器
-# 目标路径：/var/www/netops
+# 用途：在服务器上拉取最新代码并部署到 /var/www/netops
+# 使用：在项目目录下直接运行 ./deploy.sh
 ##############################################
 
 set -e  # 遇到错误立即退出
@@ -14,13 +14,14 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# 配置区域
-REMOTE_USER="${DEPLOY_USER:-root}"                    # 远程服务器用户名（可通过环境变量覆盖）
-REMOTE_HOST="${DEPLOY_HOST}"                          # 远程服务器地址（必须设置）
-REMOTE_PATH="/var/www/netops"                         # 远程部署路径
-LOCAL_DIST="dist"                                     # 本地编译目录
-BACKUP_DIR="/var/www/netops_backup"                   # 远程备份目录
+# ===== 配置区域 =====
+DEPLOY_PATH="/var/www/netops"                         # 部署目标路径
+LOCAL_DIST="dist"                                     # 编译产物目录
+BACKUP_DIR="/var/www/netops_backup"                   # 备份目录
+# ===================
+
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)                      # 时间戳
+PROJECT_DIR=$(pwd)                                    # 当前项目目录
 
 # 日志函数
 log_info() {
@@ -35,140 +36,135 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# 检查必要的环境变量
-check_config() {
-    if [ -z "$REMOTE_HOST" ]; then
-        log_error "请设置 DEPLOY_HOST 环境变量"
-        log_info "例如: export DEPLOY_HOST=netops.vdian.net"
+# 检查是否在 git 仓库中
+check_git_repo() {
+    if [ ! -d ".git" ]; then
+        log_error "当前目录不是 git 仓库"
+        log_info "请在项目根目录下运行此脚本"
         exit 1
     fi
+    log_info "Git 仓库检查通过"
 }
 
-# 检查本地 dist 目录是否存在
-check_dist() {
-    if [ ! -d "$LOCAL_DIST" ]; then
-        log_error "本地 dist 目录不存在"
-        log_info "请先运行: npm run build"
+# 拉取最新代码
+git_pull() {
+    log_info "拉取最新代码..."
+
+    # 检查是否有未提交的更改
+    if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+        log_warn "检测到未提交的更改"
+        log_info "暂存当前更改..."
+        git stash save "auto-stash-before-deploy-$TIMESTAMP"
+    fi
+
+    # 拉取最新代码
+    if git pull; then
+        log_info "代码更新成功"
+    else
+        log_error "代码拉取失败"
         exit 1
     fi
 
-    log_info "检查 dist 目录内容..."
+    # 显示当前版本信息
+    current_commit=$(git rev-parse --short HEAD)
+    current_branch=$(git branch --show-current)
+    log_info "当前分支: $current_branch"
+    log_info "当前提交: $current_commit"
+}
+
+# 检查 dist 目录
+check_dist() {
+    if [ ! -d "$LOCAL_DIST" ]; then
+        log_error "dist 目录不存在"
+        log_info "请确认 git 仓库中包含编译产物"
+        exit 1
+    fi
+
     file_count=$(find "$LOCAL_DIST" -type f | wc -l | tr -d ' ')
 
     if [ "$file_count" -lt 1 ]; then
-        log_error "dist 目录为空，请先编译项目"
+        log_error "dist 目录为空"
         exit 1
     fi
 
     log_info "dist 目录包含 $file_count 个文件"
 }
 
-# 检查远程服务器连接
-check_remote_connection() {
-    log_info "检查远程服务器连接..."
+# 备份当前版本
+backup_current() {
+    log_info "备份当前版本..."
 
-    if ! ssh -o ConnectTimeout=5 "$REMOTE_USER@$REMOTE_HOST" "echo 'connection ok'" > /dev/null 2>&1; then
-        log_error "无法连接到远程服务器 $REMOTE_USER@$REMOTE_HOST"
-        log_info "请检查："
-        log_info "  1. 服务器地址是否正确"
-        log_info "  2. SSH密钥是否配置"
-        log_info "  3. 网络是否正常"
-        exit 1
+    # 如果部署目录存在且不为空，则备份
+    if [ -d "$DEPLOY_PATH" ] && [ "$(ls -A $DEPLOY_PATH 2>/dev/null)" ]; then
+        # 创建备份目录
+        mkdir -p "$BACKUP_DIR"
+
+        # 备份当前版本
+        backup_path="$BACKUP_DIR/netops_$TIMESTAMP"
+        cp -r "$DEPLOY_PATH" "$backup_path"
+        log_info "备份已保存到: $backup_path"
+
+        # 只保留最近5个备份
+        cd "$BACKUP_DIR"
+        ls -t | tail -n +6 | xargs -r rm -rf
+        log_info "已清理旧备份，保留最近5个"
+        cd "$PROJECT_DIR"
+    else
+        log_info "无需备份：部署目录不存在或为空"
     fi
-
-    log_info "远程服务器连接正常"
 }
 
-# 备份远程现有文件
-backup_remote() {
-    log_info "备份远程现有文件..."
+# 部署到目标目录
+deploy() {
+    log_info "开始部署..."
 
-    ssh "$REMOTE_USER@$REMOTE_HOST" bash <<EOF
-        set -e
+    # 创建部署目录
+    mkdir -p "$DEPLOY_PATH"
 
-        # 如果目标目录存在且不为空，则备份
-        if [ -d "$REMOTE_PATH" ] && [ "\$(ls -A $REMOTE_PATH 2>/dev/null)" ]; then
-            # 创建备份目录
-            mkdir -p "$BACKUP_DIR"
+    # 清空部署目录
+    log_info "清空部署目录..."
+    rm -rf "$DEPLOY_PATH"/*
 
-            # 备份当前版本
-            backup_path="$BACKUP_DIR/netops_$TIMESTAMP"
-            cp -r "$REMOTE_PATH" "\$backup_path"
-            echo "备份已保存到: \$backup_path"
+    # 复制编译产物到部署目录
+    log_info "复制文件到 $DEPLOY_PATH ..."
+    cp -r "$LOCAL_DIST"/* "$DEPLOY_PATH/"
 
-            # 只保留最近5个备份
-            cd "$BACKUP_DIR"
-            ls -t | tail -n +6 | xargs -r rm -rf
-            echo "已清理旧备份，保留最近5个"
-        else
-            echo "无需备份：目标目录不存在或为空"
-        fi
-EOF
+    # 设置文件权限
+    log_info "设置文件权限..."
+    find "$DEPLOY_PATH" -type d -exec chmod 755 {} \;
+    find "$DEPLOY_PATH" -type f -exec chmod 644 {} \;
 
-    log_info "备份完成"
-}
-
-# 部署到远程服务器
-deploy_to_remote() {
-    log_info "开始部署到 $REMOTE_HOST:$REMOTE_PATH ..."
-
-    # 创建远程目录
-    ssh "$REMOTE_USER@$REMOTE_HOST" "mkdir -p $REMOTE_PATH"
-
-    # 使用 rsync 同步文件
-    log_info "同步文件..."
-    rsync -avz --delete \
-        --exclude='.git' \
-        --exclude='node_modules' \
-        --exclude='.DS_Store' \
-        "$LOCAL_DIST/" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/"
-
-    log_info "文件同步完成"
+    log_info "部署完成"
 }
 
 # 验证部署结果
 verify_deployment() {
     log_info "验证部署结果..."
 
-    remote_file_count=$(ssh "$REMOTE_USER@$REMOTE_HOST" "find $REMOTE_PATH -type f | wc -l" | tr -d ' ')
+    deployed_file_count=$(find "$DEPLOY_PATH" -type f | wc -l | tr -d ' ')
 
-    log_info "远程服务器文件数量: $remote_file_count"
+    log_info "部署目录文件数量: $deployed_file_count"
 
-    if [ "$remote_file_count" -lt 1 ]; then
-        log_error "部署验证失败：远程目录为空"
+    if [ "$deployed_file_count" -lt 1 ]; then
+        log_error "部署验证失败：部署目录为空"
         exit 1
     fi
 
     log_info "部署验证通过"
 }
 
-# 设置远程文件权限
-set_permissions() {
-    log_info "设置文件权限..."
-
-    ssh "$REMOTE_USER@$REMOTE_HOST" bash <<EOF
-        set -e
-        cd "$REMOTE_PATH"
-
-        # 设置目录权限为 755
-        find . -type d -exec chmod 755 {} \;
-
-        # 设置文件权限为 644
-        find . -type f -exec chmod 644 {} \;
-
-        echo "文件权限设置完成"
-EOF
-
-    log_info "权限设置完成"
-}
-
 # 显示部署信息
 show_deployment_info() {
+    current_commit=$(git rev-parse --short HEAD)
+    current_branch=$(git branch --show-current)
+
     log_info "====================================="
     log_info "部署完成！"
     log_info "====================================="
-    log_info "远程服务器: $REMOTE_HOST"
-    log_info "部署路径: $REMOTE_PATH"
+    log_info "项目目录: $PROJECT_DIR"
+    log_info "部署路径: $DEPLOY_PATH"
+    log_info "Git 分支: $current_branch"
+    log_info "Git 提交: $current_commit"
     log_info "部署时间: $TIMESTAMP"
     log_info "备份位置: $BACKUP_DIR/netops_$TIMESTAMP"
     log_info "====================================="
@@ -178,53 +174,46 @@ show_deployment_info() {
 rollback() {
     log_warn "执行回滚操作..."
 
-    ssh "$REMOTE_USER@$REMOTE_HOST" bash <<EOF
-        set -e
+    # 查找最新的备份
+    latest_backup=$(ls -t "$BACKUP_DIR" 2>/dev/null | head -n 1)
 
-        # 查找最新的备份
-        latest_backup=\$(ls -t "$BACKUP_DIR" 2>/dev/null | head -n 1)
+    if [ -z "$latest_backup" ]; then
+        log_error "没有找到备份文件"
+        exit 1
+    fi
 
-        if [ -z "\$latest_backup" ]; then
-            echo "错误：没有找到备份文件"
-            exit 1
-        fi
+    log_info "找到备份: $latest_backup"
+    log_info "正在回滚..."
 
-        echo "找到备份: \$latest_backup"
-        echo "正在回滚..."
+    # 删除当前版本
+    rm -rf "$DEPLOY_PATH"/*
 
-        # 删除当前版本
-        rm -rf "$REMOTE_PATH"
-
-        # 恢复备份
-        cp -r "$BACKUP_DIR/\$latest_backup" "$REMOTE_PATH"
-
-        echo "回滚完成"
-EOF
+    # 恢复备份
+    cp -r "$BACKUP_DIR/$latest_backup"/* "$DEPLOY_PATH/"
 
     log_info "回滚成功"
+    log_info "已恢复到备份: $latest_backup"
 }
 
 # 主函数
 main() {
     log_info "开始部署 NetOps 前端项目..."
+    log_info "====================================="
 
-    # 检查配置
-    check_config
+    # 检查 git 仓库
+    check_git_repo
 
-    # 检查本地编译产物
+    # 拉取最新代码
+    git_pull
+
+    # 检查 dist 目录
     check_dist
 
-    # 检查远程连接
-    check_remote_connection
+    # 备份当前版本
+    backup_current
 
-    # 备份远程文件
-    backup_remote
-
-    # 部署到远程
-    deploy_to_remote
-
-    # 设置权限
-    set_permissions
+    # 部署
+    deploy
 
     # 验证部署
     verify_deployment
@@ -237,8 +226,6 @@ main() {
 case "${1:-}" in
     "rollback")
         log_warn "开始回滚到上一个版本..."
-        check_config
-        check_remote_connection
         rollback
         ;;
     "")
@@ -248,17 +235,22 @@ case "${1:-}" in
         echo "用法: $0 [rollback]"
         echo ""
         echo "命令："
-        echo "  (无参数)    - 执行部署"
+        echo "  (无参数)    - 拉取代码并部署"
         echo "  rollback    - 回滚到上一个版本"
         echo ""
-        echo "环境变量："
-        echo "  DEPLOY_HOST - 远程服务器地址（必需）"
-        echo "  DEPLOY_USER - 远程服务器用户名（默认: root）"
+        echo "配置："
+        echo "  编辑脚本文件中的配置区域"
+        echo "  DEPLOY_PATH - 部署目标路径"
+        echo "  LOCAL_DIST  - 编译产物目录"
+        echo "  BACKUP_DIR  - 备份目录"
         echo ""
         echo "示例："
-        echo "  export DEPLOY_HOST=netops.vdian.net"
-        echo "  export DEPLOY_USER=www-data"
-        echo "  $0"
+        echo "  # 在服务器项目目录下执行部署"
+        echo "  cd /path/to/chen_vue"
+        echo "  ./deploy.sh"
+        echo ""
+        echo "  # 回滚"
+        echo "  ./deploy.sh rollback"
         exit 1
         ;;
 esac
