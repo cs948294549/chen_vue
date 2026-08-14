@@ -14,10 +14,16 @@
 ### 1. API_BASE_URL
 后端 API 服务器地址
 
-### 2. AES_SECRET
+### 2. SOCKET_URL
+WebSocket 服务器地址（不含协议，自动适配 http/https）
+
+### 3. SOCKET_PATH
+WebSocket 连接路径
+
+### 4. AES_SECRET
 AES 对称加密密钥，**仅在前端使用**，用于客户端本地数据加密
 
-### 3. MD5_SALT
+### 5. MD5_SALT
 MD5 加盐值，**仅在前端使用**，用于客户端数据签名
 
 ## 修改配置
@@ -30,11 +36,12 @@ MD5 加盐值，**仅在前端使用**，用于客户端数据签名
 module.exports = merge(prodEnv, {
   NODE_ENV: '"development"',
   API_BASE_URL: '"netops.vdian.net/api"',
+  // SOCKET_URL 和 SOCKET_PATH 继承自 prod.env.js
   // AES_SECRET 和 MD5_SALT 继承自 prod.env.js
 })
 ```
 
-> 注意：开发环境默认继承生产环境的加密配置，确保加密一致性
+> 注意：开发环境默认继承生产环境的配置，确保配置一致性
 
 ### 生产环境
 
@@ -44,6 +51,8 @@ module.exports = merge(prodEnv, {
 module.exports = {
   NODE_ENV: '"production"',
   API_BASE_URL: '"netops.vdian.net/api"',
+  SOCKET_URL: '"netops.vdian.net"',
+  SOCKET_PATH: '"/sock/socket.io"',
   AES_SECRET: '"your-aes-secret-key"',
   MD5_SALT: '"your-md5-salt"'
 }
@@ -104,12 +113,14 @@ config/secret.env.example.js
 
 ### 本地开发环境
 ```javascript
-// config/dev.env.js
-module.exports = merge(prodEnv, {
-  NODE_ENV: '"development"',
+// config/prod.env.js
+module.exports = {
+  NODE_ENV: '"production"',
   API_BASE_URL: '"localhost:5000"',
+  SOCKET_URL: '"localhost"',
+  SOCKET_PATH: '"/sock/socket.io"',
   // 继承 prod.env.js 的加密配置
-})
+}
 ```
 
 ### 测试环境
@@ -118,6 +129,8 @@ module.exports = merge(prodEnv, {
 module.exports = {
   NODE_ENV: '"production"',
   API_BASE_URL: '"chen.test.com/api"',
+  SOCKET_URL: '"chen.test.com"',
+  SOCKET_PATH: '"/sock/socket.io"',
   AES_SECRET: '"test-secret-key-32chars-long"',
   MD5_SALT: '"test-salt-value"'
 }
@@ -129,6 +142,8 @@ module.exports = {
 module.exports = {
   NODE_ENV: '"production"',
   API_BASE_URL: '"netops.vdian.net/api"',
+  SOCKET_URL: '"netops.vdian.net"',
+  SOCKET_PATH: '"/sock/socket.io"',
   AES_SECRET: '"prod-secret-key-32chars-long"',
   MD5_SALT: '"prod-salt-value"'
 }
@@ -150,6 +165,8 @@ module.exports = {
 
 如果环境变量未配置，将使用以下默认值（仅用于开发调试）：
 - `API_BASE_URL`: `"localhost:5000"`
+- `SOCKET_URL`: `"netops.vdian.net"`
+- `SOCKET_PATH`: `"/sock/socket.io"`
 - `AES_SECRET`: `"3a4b3ca0247e0500da70d637f6c5ded8"`
 - `MD5_SALT`: `"eyJhbGciOiJIUzI1NiIsIn"`
 
