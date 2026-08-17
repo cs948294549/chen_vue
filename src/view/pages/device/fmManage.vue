@@ -21,13 +21,13 @@
                 <div style="display: flex;flex-direction: column; margin-left: 10px;width: 400px;">
                   <div style="white-space: nowrap;">
                     <span>设备名：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.sysname}}</span>
                     </router-link>
                   </div>
                   <div style="white-space: nowrap;">
                     <span>设备IP：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.ip}}</span>
                     </router-link>
                   </div>
@@ -54,13 +54,13 @@
                 <div style="display: flex;flex-direction: column; margin-left: 10px;width: 400px;">
                   <div style="white-space: nowrap;">
                     <span>设备名：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.sysname}}</span>
                     </router-link>
                   </div>
                   <div style="white-space: nowrap;">
                     <span>设备IP：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.ip}}</span>
                     </router-link>
                   </div>
@@ -90,13 +90,13 @@
                 <div style="display: flex;flex-direction: column; margin-left: 10px;width: 400px;">
                   <div style="white-space: nowrap;">
                     <span>设备名：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.sysname}}</span>
                     </router-link>
                   </div>
                   <div style="white-space: nowrap;">
                     <span>设备IP：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.ip}}</span>
                     </router-link>
                   </div>
@@ -133,13 +133,13 @@
                 <div style="display: flex;flex-direction: column; margin-left: 10px;width: 400px;">
                   <div style="white-space: nowrap;">
                     <span>设备名：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.sysname}}</span>
                     </router-link>
                   </div>
                   <div style="white-space: nowrap;">
                     <span>设备IP：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.ip}}</span>
                     </router-link>
                   </div>
@@ -168,13 +168,13 @@
                 <div style="display: flex;flex-direction: column; margin-left: 10px;width: 400px;">
                   <div style="white-space: nowrap;">
                     <span>设备名：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.sysname}}</span>
                     </router-link>
                   </div>
                   <div style="white-space: nowrap;">
                     <span>设备IP：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.ip}}</span>
                     </router-link>
                   </div>
@@ -203,13 +203,13 @@
                 <div style="display: flex;flex-direction: column; margin-left: 10px;width: 400px;">
                   <div style="white-space: nowrap;">
                     <span>设备名：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.sysname}}</span>
                     </router-link>
                   </div>
                   <div style="white-space: nowrap;">
                     <span>设备IP：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.ip}}">
                       <span>{{dev.ip}}</span>
                     </router-link>
                   </div>
@@ -245,13 +245,13 @@
                 <div style="display: flex;flex-direction: column; margin-left: 10px;width: 400px;">
                   <div style="white-space: nowrap;">
                     <span>设备名：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.loc_ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.loc_ip}}">
                       <span>{{dev.loc_name}}</span>
                     </router-link>
                   </div>
                   <div style="white-space: nowrap;">
                     <span>设备IP：</span>
-                    <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:dev.loc_ip}}">
+                    <router-link :to="{path: '/pages/device/device_detail', query:{dev:dev.loc_ip}}">
                       <span>{{dev.loc_ip}}</span>
                     </router-link>
                   </div>

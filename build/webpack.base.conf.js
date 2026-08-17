@@ -34,7 +34,7 @@ module.exports = {
       : config.dev.assetsPublicPath
   },
   resolve: {
-    extensions: ['.js', '.vue', '.json'],
+    extensions: ['.js', '.vue', '.json', '.mjs'],
     alias: {
       'vue$': 'vue/dist/vue.esm.js',
       '@': resolve('src'),
@@ -43,15 +43,20 @@ module.exports = {
   module: {
     rules: [
       {
+        test: /\.mjs$/,
+        include: /node_modules/,
+        type: 'javascript/auto'
+      },
+      {
         test: /\.vue$/,
         loader: 'vue-loader',
         options: vueLoaderConfig
       },
       {
-        test: /\.js$/,
+        test: /\.m?js$/,
         loader: 'babel-loader',
         include: [resolve('src'), resolve('test')],
-        exclude: /(node_modules)/
+        exclude: [/node_modules/]
       },
       {
         test: /\.(png|jpe?g|gif|svg)(\?.*)?$/,

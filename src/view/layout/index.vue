@@ -1,9 +1,9 @@
 <template>
-  <div style="display: flex;flex-direction: column;">
+  <div style="display: flex;flex-direction: column;height: 100vh;">
     <TopMenu ref="top_menu" @changeGroup="changeGroupItem" />
-    <div style="display: flex;max-height: 100vh;">
+    <div style="display: flex;flex: 1;overflow: hidden;">
       <SideMenu ref="side_menu" @changeMenu="changeTab" />
-      <div style="flex: 1;margin: 10px;">
+      <div style="flex: 1;margin: 10px;overflow-y: auto;display: flex;flex-direction: column;">
         <TabMenu ref="tab_nav" style="padding-bottom: 10px;border-bottom: 1px solid #eee;"></TabMenu>
         <!-- 这里是页面的主要内容区域 -->
         <transition name="main" mode="out-in">
