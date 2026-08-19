@@ -26,8 +26,8 @@
             </div>
           </div>
         </div>
-        <div style="margin: 10px; display: flex;">
-          <div style="margin: 5px;">
+        <div style="margin: 10px; display: flex; align-items: center;">
+          <div style="margin-top: 1px;">
             <el-dropdown>
               <span style="cursor: pointer;">
                 设备查询菜单<i class="el-icon-arrow-down el-icon--right"></i>
@@ -79,11 +79,11 @@
             </el-dropdown>
           </div>
 
-          <div style="margin-top: 1px;margin-left: 5px;">
-            <el-button type="text" @click="diy_exec" plain>自定义查询</el-button>
+          <div style="margin-top: 1px;margin-left: 20px;">
+            <el-button type="text" size="mini" style="padding: 7px 15px;border: 1px solid #dcdfe6;" @click="diy_exec" plain>自定义查询</el-button>
           </div>
           
-          <div style="margin-top: 1px;margin-left: 10px;">
+          <div style="margin-top: 1px;margin-left: 20px;">
             <el-button type="primary" size="mini" @click="showXterm" plain>Xtern远程连接</el-button>
           </div>
 
@@ -763,33 +763,37 @@ export default {
       this.isload1 = true
       if(this.device_info.ip){
         collector_api.getLLDPS({"loc_ip":"^"+this.device_info.ip+"$"},{}).then(function(response){
-          if(response.data!="failed"){
+          console.log("lldp===",response.data)
+          if(response.data["code"]===0){
             let topo_info = []
-            for(let i=0;i<response.data.length;i++){
+            let lldp_data = response.data["data"]
+            for(let i=0;i<lldp_data.length;i++){
               let dev_info = {}
-              dev_info["loc_ip"] = response.data[i].loc_ip
-              dev_info["loc_name"] = response.data[i].loc_name
-              dev_info["loc_portname"] = response.data[i].loc_portname
-              dev_info["loc_alias"] = response.data[i].loc_portalias
-              dev_info["rem_ip"] = response.data[i].rem_ip
-              dev_info["rem_name"] = response.data[i].rem_name
-              dev_info["rem_portname"] = response.data[i].rem_portname
+              dev_info["loc_ip"] = lldp_data[i].loc_ip
+              dev_info["loc_name"] = lldp_data[i].loc_name
+              dev_info["loc_portname"] = lldp_data[i].loc_portname
+              dev_info["loc_alias"] = lldp_data[i].loc_portalias
+              dev_info["rem_ip"] = lldp_data[i].rem_ip
+              dev_info["rem_name"] = lldp_data[i].rem_name
+              dev_info["rem_portname"] = lldp_data[i].rem_portname
               topo_info.push(dev_info)
             }
             that.create_topo(topo_info)
           }else{
             collector_api.getLLDPS({"rem_ip":"^"+this.device_info.ip+"$"},{}).then(function(response){
-              if(response.data!="failed"){
+              console.log("lldp===",response.data)
+              if(response.data["code"]===0){
                 let topo_info = []
-                for(let i=0;i<response.data.length;i++){
+                let lldp_data = response.data["data"]
+                for(let i=0;i<lldp_data.length;i++){
                   let dev_info = {}
-                  dev_info["loc_ip"] = response.data[i].rem_ip
-                  dev_info["loc_name"] = response.data[i].rem_name
-                  dev_info["loc_portname"] = response.data[i].rem_portname
-                  dev_info["loc_alias"] = response.data[i].rem_portalias
-                  dev_info["rem_ip"] = response.data[i].loc_ip
-                  dev_info["rem_name"] = response.data[i].loc_name
-                  dev_info["rem_portname"] = response.data[i].loc_portname
+                  dev_info["loc_ip"] = lldp_data[i].rem_ip
+                  dev_info["loc_name"] = lldp_data[i].rem_name
+                  dev_info["loc_portname"] = lldp_data[i].rem_portname
+                  dev_info["loc_alias"] = lldp_data[i].rem_portalias
+                  dev_info["rem_ip"] = lldp_data[i].loc_ip
+                  dev_info["rem_name"] = lldp_data[i].loc_name
+                  dev_info["rem_portname"] = lldp_data[i].loc_portname
                   topo_info.push(dev_info)
                 }
                 that.create_topo(topo_info)

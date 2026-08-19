@@ -119,6 +119,7 @@
         term.open(document.getElementById('xterm_'+this.target_ip));
         // term.write('Hello from \x1B[1;3;31mxterm.js\x1B[0m $ ')
         term.focus();
+        document.getElementById('xterm_'+this.target_ip).addEventListener('keydown', e => e.stopPropagation());
         term.onKey((val) => {
           // console.log("===",val)
           // term.write(val);
@@ -256,9 +257,8 @@
       },
       // 空格处理
       space_key_down(){
-        let dd = this.extract_promt()
-        // console.log(";;;",dd)
-        if(/-+\s*More\s*-+/ig.test(dd)){
+        const tail = this.cmd_show.slice(-60).replace(/[^\x20-\x7e]/g, '')
+        if(/more/i.test(tail)){
           this.sendCMD(" ", "00")
         }else{
           this.term.write(" ")

@@ -27,6 +27,22 @@ export default {
     return axios.post("/collector/getlldps", data, params)
   },
 
+  getARPList (data, params) {
+    return axios.post("/collector/getarp_list", data, params)
+  },
+  getGateV4List (data, params) {
+    return axios.post("/collector/gates_v4", data, params)
+  },
+  getGateV6List (data, params) {
+    return axios.post("/collector/gates_v6", data, params)
+  },
+  getMACList (data, params) {
+    return axios.post("/collector/get_torarp", data, params)
+  },
+  getSNList (data, params) {
+    return axios.post("/collector/getdevice_sn", data, params)
+  },
+
   //command相关数据
   getCurrentInterface (data, params) {
     return axios.post("/command/dis_cur_interface", data, params)
