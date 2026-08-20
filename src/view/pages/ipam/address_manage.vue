@@ -13,7 +13,7 @@
     </div>
     <div style="display: flex;">
       <el-scrollbar style="height: 100%;margin: 10px;">
-        <div style="width: 450px;max-height: 600px;">
+        <div style="width: 800px;max-height: 800px;min-height: 100px;" v-loading="tree_loading" element-loading-text="加载网段树...">
           <el-tree
             :data="net_data"
             node-key="id"
@@ -28,6 +28,9 @@
                    :style="{color: data.children && data.children.length > 0 ? '#E6A23C' : '#67C23A', marginRight: '8px', fontSize: '16px'}"></i>
                 <span style="flex: 1;">
                   <span style="font-weight: 600; color: #303133;">{{ data.ip }}/{{data.mask}}</span>
+                  <el-tag v-if="data.status == '1'" size="mini" type="success" style="margin-left: 8px;">使用中</el-tag>
+                  <el-tag v-if="data.status == '2'" size="mini" type="danger" style="margin-left: 8px;">已废弃</el-tag>
+                  <el-tag v-if="data.status == '3'" size="mini" type="info" style="margin-left: 8px;">空闲</el-tag>
                   <span style="margin-left: 8px; color: #909399; font-size: 12px;">{{data.location}}</span>
                   <span style="margin-left: 8px; color: #606266; font-size: 12px;">{{data.role}}</span>
                   <span v-if="data.used_per" style="margin-left: 8px; padding: 2px 6px; background: #F2F6FC; border-radius: 3px; font-size: 11px; color: #909399;">
@@ -79,6 +82,31 @@
                     <span>用途</span>
                   </div>
                   <div class="info-value">{{click_node_info.role}}</div>
+                </div>
+              </el-col>
+            </el-row>
+
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <div class="info-item">
+                  <div class="info-label">
+                    <i class="el-icon-info"></i>
+                    <span>状态</span>
+                  </div>
+                  <div class="info-value">
+                    <el-tag v-if="click_node_info.status == '1'" size="small" type="success">使用中</el-tag>
+                    <el-tag v-if="click_node_info.status == '2'" size="small" type="danger">已废弃</el-tag>
+                    <el-tag v-if="click_node_info.status == '3'" size="small" type="info">空闲</el-tag>
+                  </div>
+                </div>
+              </el-col>
+              <el-col :span="12">
+                <div class="info-item">
+                  <div class="info-label">
+                    <i class="el-icon-location-outline"></i>
+                    <span>区域</span>
+                  </div>
+                  <div class="info-value">{{click_node_info.location}}</div>
                 </div>
               </el-col>
             </el-row>
@@ -248,11 +276,11 @@
                   <el-table-column
                     prop="update_time"
                     label="更新时间"
-                    width="180">
+                    width="200">
                     <template slot-scope="scope">
                       <span v-if="scope.row.update_time" style="color: #909399;">
                         <i class="el-icon-time" style="margin-right: 4px;"></i>
-                        {{ scope.row.update_time }}
+                        {{ formatDate(scope.row.update_time * 1000) }}
                       </span>
                       <span v-else style="color: #C0C4CC;">-</span>
                     </template>
@@ -438,11 +466,12 @@ export default {
     return {
       net_data: [],
       default_expand: [],
+      tree_loading: false,  // 树形图加载状态
 
       // 新增网段配置
       dialog_view_cfg: false,
       address_view_option: {},
-      isp_options: ["BGP", "电信", "移动", "联通", "阿里云", "海外线路", "IPv6出口", "私有"],
+      isp_options: ["静态三线", "BGP", "电信", "移动", "联通", "阿里云", "海外线路", "IPv6出口", "私有"],
       address_status_options: {
         "1": "使用中",
         "2": "已废弃",
@@ -596,11 +625,14 @@ export default {
       let post_data = {}
       let that = this
       this.net_data = []
+      this.tree_loading = true  // 开始加载
+      console.log('开始加载，tree_loading:', this.tree_loading)
 
       ipam_api.getNetworkAddressTree(post_data, {}).then(function(response) {
-        console.log(response.data)
+        console.log('接口返回:', response.data)
         if (response.data.code === 0) {
           that.net_data = response.data.data || []
+          console.log('设置数据，条数:', that.net_data.length)
         } else {
           that.$message({
             type: 'error',
@@ -613,6 +645,9 @@ export default {
           type: 'error',
           message: '查询失败，请重试'
         })
+      }).finally(function() {
+        that.tree_loading = false  // 加载完成
+        console.log('加载完成，tree_loading:', that.tree_loading)
       })
     },
 
