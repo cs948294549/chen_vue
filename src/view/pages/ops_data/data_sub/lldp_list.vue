@@ -27,7 +27,7 @@
       </el-row>
     </div>
 
-    <el-table border :data.sync='table_info_show' @selection-change="handleSelectionChange" :default-sort = "{prop: 'port_id'}" border size="mini">
+    <el-table border :data.sync='table_info_show' @selection-change="handleSelectionChange" :default-sort = "{prop: 'port_id'}" size="mini">
       <el-table-column prop='loc_ip' label='本端IP' show-overflow-tooltip min-width='15' align='center'>
       </el-table-column>
       <el-table-column prop='loc_name' label='本端设备名' show-overflow-tooltip min-width='15' align='center'>

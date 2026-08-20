@@ -97,16 +97,33 @@ export default {
 
     getRouteList(){
       let that = this
-      login_api.getRoleRouteList({},{}).then(function (response) {
-        // console.log("加载 route===",response.data)
-        if(response.data.code==0){
-          localStorage.setItem("RouteList", JSON.stringify(response.data.data))
-          that.$router.push('/');
-        }
-      })
-      .catch(function (error) {
-        console.log(error)
-      })
+      // 添加短暂延迟，确保Cookie已经设置完成
+      setTimeout(() => {
+        login_api.getRoleRouteList({},{}).then(function (response) {
+          // console.log("加载 route===",response.data)
+          if(response && response.data && response.data.code==0){
+            localStorage.setItem("RouteList", JSON.stringify(response.data.data))
+            that.$router.push('/');
+          } else if(response && response.data && response.data.code==403){
+            that.$message({
+              type: 'error',
+              message: '权限不足，无法获取路由信息'
+            });
+          } else {
+            that.$message({
+              type: 'error',
+              message: '获取路由信息失败'
+            });
+          }
+        })
+        .catch(function (error) {
+          console.log(error)
+          that.$message({
+            type: 'error',
+            message: '获取路由信息失败，请重新登录'
+          });
+        })
+      }, 100)
     },
 
     // 处理登录
