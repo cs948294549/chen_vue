@@ -231,10 +231,10 @@
                   <el-switch
                     v-model="filter_address_flag"
                     @change="tran_status_address"
-                    active-text="已使用"
-                    inactive-text="未使用"
+                    active-text="仅已使用"
+                    inactive-text="显示所有"
                     active-color="#67C23A"
-                    inactive-color="#909399"
+                    inactive-color="#409EFF"
                     style="margin-left: 15px;">
                   </el-switch>
                 </div>
@@ -550,19 +550,16 @@ export default {
     // 切换IP地址显示状态
     tran_status_address(val) {
       if (val) {
-        // 显示已使用：直接使用数据库返回的数据
+        // 仅显示已使用：直接使用数据库返回的数据
         this.ipam_address_data_show = this.ipam_address_data
         this.ipam_address_total = this.ipam_address_data.length
       } else {
-        // 显示未使用：计算总数，但不生成所有记录
+        // 显示所有：已使用+未使用
         const startIp = parseInt(this.click_node_info["start_ip"])
         const endIp = parseInt(this.click_node_info["end_ip"])
-        const totalIps = endIp - startIp
-        const usedIpSet = new Set(this.ipam_address_data.map(item => parseInt(item.ip_deci)))
-
-        // 计算未使用的IP总数
-        this.ipam_address_total = totalIps - usedIpSet.size
-        this.ipam_address_data_show = null // 标记为未使用模式
+        const totalIps = endIp - startIp + 1  // 包含起始和结束IP
+        this.ipam_address_total = totalIps
+        this.ipam_address_data_show = null // 标记为显示所有模式
       }
 
       this.currentPage = 1
@@ -572,34 +569,41 @@ export default {
     // 更新当前页数据
     updatePageData() {
       if (this.ipam_address_data_show !== null) {
-        // 已使用模式：直接分页
+        // 仅已使用模式：直接分页
         const start = (this.currentPage - 1) * this.pageSize
         const end = start + this.pageSize
         this.ipam_address_data_page = this.ipam_address_data_show.slice(start, end)
       } else {
-        // 未使用模式：按需生成当前页的未使用IP
+        // 显示所有模式：按需生成当前页的所有IP（已使用+未使用）
         const startIp = parseInt(this.click_node_info["start_ip"])
         const endIp = parseInt(this.click_node_info["end_ip"])
-        const usedIpSet = new Set(this.ipam_address_data.map(item => parseInt(item.ip_deci)))
+
+        // 构建已使用IP的映射表，方便快速查找
+        const usedIpMap = {}
+        this.ipam_address_data.forEach(item => {
+          usedIpMap[parseInt(item.ip_deci)] = item
+        })
 
         const pageData = []
-        let count = 0
         const skipCount = (this.currentPage - 1) * this.pageSize
+        const startIndex = startIp + skipCount
+        const endIndex = Math.min(startIndex + this.pageSize, endIp + 1)
 
-        // 遍历IP范围，跳过已使用的，只收集当前页需要的未使用IP
-        for (let i = startIp; i < endIp && pageData.length < this.pageSize; i++) {
-          if (!usedIpSet.has(i)) {
-            if (count >= skipCount) {
-              pageData.push({
-                "ip_deci": i,
-                "ip_addr": this.intToIp(i),
-                "collect_type": "",
-                "admin_status": "",
-                "comment": "",
-                "update_time": ""
-              })
-            }
-            count++
+        // 生成当前页的IP列表
+        for (let i = startIndex; i < endIndex; i++) {
+          if (usedIpMap[i]) {
+            // 已使用的IP，使用数据库中的数据
+            pageData.push(usedIpMap[i])
+          } else {
+            // 未使用的IP，生成空记录
+            pageData.push({
+              "ip_deci": i,
+              "ip_addr": this.intToIp(i),
+              "collect_type": "",
+              "admin_status": "",
+              "comment": "",
+              "update_time": ""
+            })
           }
         }
 
