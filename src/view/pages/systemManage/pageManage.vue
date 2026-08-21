@@ -37,6 +37,7 @@
 
 
     <el-dialog title="新增页面" width="50%" :visible.sync="dialogVisible" destroy-on-close :close-on-click-modal="false" append-to-body>
+      <el-alert title="提示：目录不能添加路径，添加路径后会自动变为路由类型" type="info" :closable="false" style="margin-bottom: 15px;"></el-alert>
       <el-form label-width="100px" ref="create_form" :rules="form_rules" :model="editForm">
         <el-form-item label="类型" prop="p_type">
           <el-select v-model="editForm.p_type" placeholder="请选择类型">
