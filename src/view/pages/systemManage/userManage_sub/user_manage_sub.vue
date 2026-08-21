@@ -33,6 +33,7 @@
           v-bind:download_flag="false"
           @deleteRow="deleteRow"
           @updateRow="updateRow"
+          @resetIdentify="resetIdentify"
           >
         </tem_table>
       </div>
@@ -90,6 +91,35 @@
         </el-form-item>
       </el-form>
     </el-dialog>
+
+    <el-dialog title="重置用户凭证" :visible.sync="diag_reset_flag" width="50%" append-to-body>
+      <el-form v-model="reset_user_data" size="mini" label-width="100px">
+        <el-form-item label="用户名">
+          <el-input style="width: 500px;" v-model="reset_user_data.username" disabled readonly></el-input>
+        </el-form-item>
+        <el-form-item label="重置方式">
+          <el-radio-group v-model="reset_type">
+            <el-radio label="default">重置为默认密码 (123456)</el-radio>
+            <el-radio label="random">重置为随机密码</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="随机密码" v-if="reset_type === 'random'">
+          <el-input style="width: 500px;" v-model="random_password" disabled readonly></el-input>
+          <el-button size="mini" @click="generateRandomPassword" style="margin-left: 10px;">重新生成</el-button>
+        </el-form-item>
+        <el-alert
+          v-if="reset_type === 'random'"
+          title="请务必记录此随机密码，重置后将无法再次查看！"
+          type="warning"
+          :closable="false"
+          style="margin-bottom: 15px;">
+        </el-alert>
+        <el-form-item>
+          <el-button type="primary" :loading="isload" @click="submit_reset()">确认重置</el-button>
+          <el-button type="primary" @click="diag_reset_flag=false">取消</el-button>
+        </el-form-item>
+      </el-form>
+    </el-dialog>
   </div>
 </template>
 
@@ -120,10 +150,12 @@
           {"key":"identify","label":"凭证","width":"120"},
           {"key":"phone","label":"电话","width":"120"},
           {"key":"mail","label":"邮箱","width":"120"},
-          {"key":"last_login","label":"最近登陆时间","width":"120", "type":"date"},
+          {"key":"update_time","label":"最近修改时间","width":"140", "type":"date"},
+          {"key":"last_login","label":"最近登陆时间","width":"140", "type":"date"},
         ],
         tab_single_btns:[
           {"label":"修改","type":"primary","click":"updateRow"},
+          {"label":"重置凭证","type":"warning","click":"resetIdentify"},
           {"label":"删除","type":"danger","click":"deleteRow"}
         ],
 
@@ -131,6 +163,11 @@
         feature_user:{},
 
         diag_update_flag:false,
+
+        diag_reset_flag:false,
+        reset_user_data:{},
+        reset_type:'default',
+        random_password:'',
 
         role_list:[]
 
@@ -324,6 +361,77 @@
             message: '取消操作'
           });
         });
+      },
+
+      resetIdentify(val, rowid){
+        // 打开重置凭证对话框
+        this.reset_user_data = {
+          username: val.username,
+          rowid: rowid
+        }
+        this.reset_type = 'default'
+        this.random_password = ''
+        this.diag_reset_flag = true
+      },
+
+      generateRandomPassword(){
+        // 生成8位随机密码（包含大小写字母和数字）
+        const chars = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678'
+        let password = ''
+        for (let i = 0; i < 8; i++) {
+          password += chars.charAt(Math.floor(Math.random() * chars.length))
+        }
+        this.random_password = password
+      },
+
+      submit_reset(){
+        let password_to_use = ''
+        let display_password = ''
+
+        if(this.reset_type === 'default'){
+          password_to_use = '123456'
+          display_password = '123456'
+        } else {
+          // 随机密码
+          if(!this.random_password){
+            this.generateRandomPassword()
+          }
+          password_to_use = this.random_password
+          display_password = this.random_password
+        }
+
+        let that = this
+        this.isload = true
+        let post_data = {
+          "username": this.reset_user_data.username,
+          "new_identify": lmd5.salt_identify(password_to_use)
+        }
+
+        role_api.resetUserIdentify(post_data, {}).then(function(response){
+          if(response.data.code==0){
+            that.diag_reset_flag = false
+            that.$alert('用户 ' + that.reset_user_data.username + ' 的凭证已重置为：' + display_password, '重置成功', {
+              confirmButtonText: '确定',
+              type: 'success',
+              callback: action => {
+                that.searchKey()
+              }
+            });
+          }else{
+            that.$message({
+              type: 'error',
+              message: "重置失败,原因:"+response.data.message
+            });
+          }
+          that.isload = false
+        }).catch(function (error) {
+            console.log(error)
+            that.isload = false
+            that.$message({
+              type: 'error',
+              message: "重置异常"
+            });
+        })
       },
     },
     components:{

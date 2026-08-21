@@ -13,33 +13,55 @@
     </div>
     <div style="display: flex;">
       <el-scrollbar style="height: 100%;margin: 10px;">
-        <div style="width: 800px;max-height: 800px;min-height: 100px;" v-loading="tree_loading" element-loading-text="加载网段树...">
-          <el-tree
-            :data="net_data"
-            node-key="id"
-            @node-click="show_node"
-            :default-expanded-keys="default_expand"
-            :default-expand-all="false"
-            :expand-on-click-node="false"
-            :highlight-current="true">
-            <span class="custom-tree-node" slot-scope="{ node, data }">
-              <span style="display: flex; align-items: center; width: 100%;">
-                <i :class="data.children && data.children.length > 0 ? 'el-icon-folder' : 'el-icon-document'"
-                   :style="{color: data.children && data.children.length > 0 ? '#E6A23C' : '#67C23A', marginRight: '8px', fontSize: '16px'}"></i>
-                <span style="flex: 1;">
-                  <span style="font-weight: 600; color: #303133;">{{ data.ip }}/{{data.mask}}</span>
-                  <el-tag v-if="data.status == '1'" size="mini" type="success" style="margin-left: 8px;">使用中</el-tag>
-                  <el-tag v-if="data.status == '2'" size="mini" type="danger" style="margin-left: 8px;">已废弃</el-tag>
-                  <el-tag v-if="data.status == '3'" size="mini" type="info" style="margin-left: 8px;">空闲</el-tag>
-                  <span style="margin-left: 8px; color: #909399; font-size: 12px;">{{data.location}}</span>
-                  <span style="margin-left: 8px; color: #606266; font-size: 12px;">{{data.role}}</span>
-                  <span v-if="data.used_per" style="margin-left: 8px; padding: 2px 6px; background: #F2F6FC; border-radius: 3px; font-size: 11px; color: #909399;">
-                    使用率: {{data.used_per}}
+        <div style="width: 800px;max-height: 800px;min-height: 100px;">
+          <!-- IP地址搜索框 -->
+          <div style="margin-bottom: 15px; padding: 10px; background: #fff; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <el-input
+              v-model="searchIpAddress"
+              placeholder="输入IP地址搜索（例如：192.168.1.0）"
+              clearable
+              @input="handleSearchIp"
+              @clear="clearSearchIp"
+              prefix-icon="el-icon-search"
+              size="small">
+              <el-button slot="append" icon="el-icon-search" @click="searchAndLocateIp">定位</el-button>
+            </el-input>
+            <div v-if="searchResultText" style="margin-top: 8px; font-size: 12px;" :style="{color: searchResultColor}">
+              <i :class="searchResultIcon"></i> {{ searchResultText }}
+            </div>
+          </div>
+
+          <!-- 网段树 -->
+          <div v-loading="tree_loading" element-loading-text="加载网段树...">
+            <el-tree
+              ref="ipTree"
+              :data="net_data"
+              node-key="id"
+              @node-click="show_node"
+              :default-expanded-keys="default_expand"
+              :default-expand-all="false"
+              :expand-on-click-node="false"
+              :highlight-current="true"
+              :filter-node-method="filterNode">
+              <span class="custom-tree-node" slot-scope="{ node, data }">
+                <span style="display: flex; align-items: center; width: 100%;">
+                  <i :class="data.children && data.children.length > 0 ? 'el-icon-folder' : 'el-icon-document'"
+                     :style="{color: data.children && data.children.length > 0 ? '#E6A23C' : '#67C23A', marginRight: '8px', fontSize: '16px'}"></i>
+                  <span style="flex: 1;">
+                    <span style="font-weight: 600; color: #303133;">{{ data.ip }}/{{data.mask}}</span>
+                    <el-tag v-if="data.status == '1'" size="mini" type="success" style="margin-left: 8px;">使用中</el-tag>
+                    <el-tag v-if="data.status == '2'" size="mini" type="danger" style="margin-left: 8px;">已废弃</el-tag>
+                    <el-tag v-if="data.status == '3'" size="mini" type="info" style="margin-left: 8px;">空闲</el-tag>
+                    <span style="margin-left: 8px; color: #909399; font-size: 12px;">{{data.location}}</span>
+                    <span style="margin-left: 8px; color: #606266; font-size: 12px;">{{data.role}}</span>
+                    <span v-if="data.used_per" style="margin-left: 8px; padding: 2px 6px; background: #F2F6FC; border-radius: 3px; font-size: 11px; color: #909399;">
+                      使用率: {{data.used_per}}
+                    </span>
                   </span>
                 </span>
               </span>
-            </span>
-          </el-tree>
+            </el-tree>
+          </div>
         </div>
       </el-scrollbar>
 
@@ -468,6 +490,12 @@ export default {
       default_expand: [],
       tree_loading: false,  // 树形图加载状态
 
+      // IP地址搜索
+      searchIpAddress: '',
+      searchResultText: '',
+      searchResultColor: '',
+      searchResultIcon: '',
+
       // 新增网段配置
       dialog_view_cfg: false,
       address_view_option: {},
@@ -506,6 +534,109 @@ export default {
   },
 
   methods: {
+    // IP地址搜索处理
+    handleSearchIp() {
+      if (!this.searchIpAddress) {
+        this.clearSearchIp()
+        return
+      }
+    },
+
+    // 清空搜索
+    clearSearchIp() {
+      this.searchResultText = ''
+      this.searchResultColor = ''
+      this.searchResultIcon = ''
+      if (this.$refs.ipTree) {
+        this.$refs.ipTree.filter('')
+      }
+    },
+
+    // 搜索并定位IP
+    searchAndLocateIp() {
+      if (!this.searchIpAddress || !this.searchIpAddress.trim()) {
+        this.$message({
+          type: 'warning',
+          message: '请输入要搜索的IP地址'
+        })
+        return
+      }
+
+      const searchIp = this.searchIpAddress.trim()
+
+      // 验证IP地址格式
+      if (!/^(\d+\.){3}\d+$/.test(searchIp)) {
+        this.searchResultText = 'IP地址格式不正确'
+        this.searchResultColor = '#F56C6C'
+        this.searchResultIcon = 'el-icon-warning'
+        return
+      }
+
+      // 将IP转换为整数用于范围判断
+      const searchIpInt = this.ipToInt(searchIp)
+
+      // 递归查找包含该IP的网段
+      const findNodeByIp = (nodes, parentPath = []) => {
+        for (let node of nodes) {
+          const nodePath = [...parentPath, node.id]
+
+          // start_ip和end_ip是字符串类型的整数，需要转换为数字进行比较
+          const nodeStartIp = Number(node.start_ip)
+          const nodeEndIp = Number(node.end_ip)
+
+          // 判断IP是否在当前网段范围内
+          if (searchIpInt >= nodeStartIp && searchIpInt <= nodeEndIp) {
+            // 如果有子节点，继续在子节点中查找更精确的匹配
+            if (node.children && node.children.length > 0) {
+              const childResult = findNodeByIp(node.children, nodePath)
+              if (childResult) {
+                return childResult
+              }
+            }
+
+            // 返回当前节点和路径
+            return {
+              node: node,
+              path: nodePath
+            }
+          }
+        }
+        return null
+      }
+
+      const result = findNodeByIp(this.net_data)
+
+      if (result) {
+        // 展开父节点路径
+        this.default_expand = result.path
+
+        // 高亮并选中节点
+        this.$nextTick(() => {
+          if (this.$refs.ipTree) {
+            this.$refs.ipTree.setCurrentKey(result.node.id)
+          }
+
+          // 触发节点点击事件，显示详细信息
+          this.show_node(result.node)
+
+          // 显示成功提示
+          this.searchResultText = `已定位到网段: ${result.node.ip}/${result.node.mask}`
+          this.searchResultColor = '#67C23A'
+          this.searchResultIcon = 'el-icon-success'
+        })
+      } else {
+        this.searchResultText = `未找到包含 ${searchIp} 的网段`
+        this.searchResultColor = '#E6A23C'
+        this.searchResultIcon = 'el-icon-info'
+      }
+    },
+
+    // 树节点过滤方法
+    filterNode(value, data) {
+      if (!value) return true
+      return data.ip.indexOf(value) !== -1
+    },
+
     // 点击树节点
     show_node(node) {
       console.log("点击了====", node)
@@ -851,7 +982,7 @@ export default {
     // IP转整数
     ipToInt(ip) {
       const parts = ip.split('.')
-      return (parseInt(parts[0]) << 24) + (parseInt(parts[1]) << 16) + (parseInt(parts[2]) << 8) + parseInt(parts[3])
+      return ((parseInt(parts[0]) << 24) >>> 0) + (parseInt(parts[1]) << 16) + (parseInt(parts[2]) << 8) + parseInt(parts[3])
     },
 
     // 新增保留IP
