@@ -51,6 +51,31 @@
 		},
 		data(){
 			return{
+				network: null,
+				nodesDataSet: null,
+				edgesDataSet: null
+			}
+		},
+		watch: {
+			node_list: {
+				handler(newNodes) {
+					// 如果network已初始化，更新节点数据
+					if (this.network && this.nodesDataSet) {
+						this.nodesDataSet.clear()
+						this.nodesDataSet.add(this.setPosition())
+					}
+				},
+				deep: true
+			},
+			link_list: {
+				handler(newEdges) {
+					// 如果network已初始化，更新边数据
+					if (this.network && this.edgesDataSet) {
+						this.edgesDataSet.clear()
+						this.edgesDataSet.add(newEdges)
+					}
+				},
+				deep: true
 			}
 		},
 		mounted(){
@@ -89,10 +114,14 @@
 				// create a network
 				let container = document.getElementById(this.toponame);
 
+				// 使用DataSet以支持动态更新
+				this.nodesDataSet = new vis.DataSet(nodes)
+				this.edgesDataSet = new vis.DataSet(edges)
+
 				// provide the data in the vis format
 				let data = {
-					nodes: nodes,
-					edges: edges
+					nodes: this.nodesDataSet,
+					edges: this.edgesDataSet
 				};
 				let options = {
 					edges: {
@@ -111,6 +140,9 @@
 				};
 				// initialize your network!
 				let network = new vis.Network(container, data, options);
+
+				// 保存network实例供外部调用
+				this.network = network
 
 				let postdev=list2dict(nodes)
 				let idlist=Object.keys(postdev);

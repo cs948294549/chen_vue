@@ -1,550 +1,290 @@
 <template>
-  <div>
-    <div>
-      <el-row>
-        <el-form style="text-align: right; margin-right: 5px;" size="mini" :inline="true">
-          <el-form-item>
-            <el-button type="primary" icon="el-icon-plus" @click="handleAdd">新增设备</el-button>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="danger" icon="el-icon-delete" :disabled="multipleSelection.length === 0" @click="handleBatchDelete">
-              批量删除 ({{ multipleSelection.length }})
-            </el-button>
-          </el-form-item>
-          <el-form-item label="搜索">
-            <el-input placeholder="IP地址或设备名称" v-model="filter_search" @keyup.enter.native="getIpList" clearable></el-input>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :loading='isload' @click="getIpList">查询</el-button>
-          </el-form-item>
-        </el-form>
-      </el-row>
+  <div class="topology-manage-page">
+    <!-- 左侧分类树（包含拓扑列表） -->
+    <div class="left-panel">
+      <TopologyTree
+        :topology-list="topologyList"
+        @create="handleCreateTopology"
+        @open="handleOpenTopology"
+        @edit="handleEditTopology"
+        @delete="handleDeleteTopology">
+      </TopologyTree>
     </div>
 
-    <el-table border :data.sync='table_info_show' @selection-change="handleSelectionChange" size="mini">
-      <el-table-column type="selection" width="55" align='center'></el-table-column>
-      <el-table-column prop='ip' label='IP地址' show-overflow-tooltip min-width='15' align='center'></el-table-column>
-      <el-table-column prop='sysname' label='设备名称' show-overflow-tooltip min-width='28' align='center'></el-table-column>
-      <el-table-column prop='community' label='SNMP Community' show-overflow-tooltip min-width='15' align='center'></el-table-column>
-      <el-table-column prop='admin_status' label='管理状态' show-overflow-tooltip min-width='10' align='center'>
-        <template slot-scope="scope">
-          <el-tag v-if="scope.row.admin_status === '0'" size="small" type="success">正常</el-tag>
-          <el-tag v-else size="small" type="danger">屏蔽</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop='timestamp' label='更新时间' show-overflow-tooltip min-width='20' align='center'>
-        <template slot-scope="scope">
-          {{ formatTimestamp(scope.row.timestamp) }}
-        </template>
-      </el-table-column>
-      <el-table-column label='操作' width='200' align='center' fixed="right">
-        <template slot-scope="scope">
-          <el-button type="primary" size="mini" icon="el-icon-edit" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button type="danger" size="mini" icon="el-icon-delete" @click="handleDelete(scope.row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <el-pagination @current-change='handleCurrentChange' :current-page='table_currentPage' @size-change="handleSizeChange"
-      :page-sizes="[20, 50, 100, 200]" :page-size="table_size" layout='total, sizes, prev, pager, next' :total='table_total' style='float: right'></el-pagination><br/>
-
-    <!-- 新增/编辑对话框 -->
-    <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="700px" :close-on-click-modal="false">
-      <el-form ref="ipForm" :model="formData" :rules="formRules" label-width="140px" size="small">
-        <el-form-item v-if="!isEdit" label="IP地址" prop="ip_list">
-          <el-input
-            type="textarea"
-            v-model="formData.ip_list"
-            placeholder="请输入IP地址，每行一个&#10;例如:&#10;192.168.1.1&#10;192.168.1.2"
-            :rows="5"
-            clearable>
-          </el-input>
-        </el-form-item>
-        <el-form-item v-if="isEdit" label="IP地址" prop="ip">
-          <el-input v-model="formData.ip" :disabled="true"></el-input>
-        </el-form-item>
-        <el-form-item v-if="isEdit" label="设备名称" prop="sysname">
-          <el-input v-model="formData.sysname" placeholder="请输入设备名称" clearable></el-input>
-        </el-form-item>
-        <el-form-item label="Community" prop="community">
-          <el-input v-model="formData.community" placeholder="默认: vdiannet" clearable></el-input>
-        </el-form-item>
-        <el-form-item v-if="isEdit" label="管理状态" prop="admin_status">
-          <el-radio-group v-model="formData.admin_status">
-            <el-radio label="0">正常</el-radio>
-            <el-radio label="1">屏蔽</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
-
-      <!-- 检测结果表格 -->
-      <div v-if="!isEdit && detectionResults.length > 0" style="margin-top: 20px;">
-        <el-divider>检测结果</el-divider>
-        <el-table :data="detectionResults" border size="mini" max-height="300">
-          <el-table-column prop="ip" label="IP地址" width="150" align="center"></el-table-column>
-          <el-table-column prop="sysname" label="设备名称" show-overflow-tooltip align="center"></el-table-column>
-          <el-table-column prop="status" label="状态" width="100" align="center">
-            <template slot-scope="scope">
-              <el-tag v-if="scope.row.status === 'success'" size="small" type="success">成功</el-tag>
-              <el-tag v-else size="small" type="danger">失败</el-tag>
-            </template>
-          </el-table-column>
-        </el-table>
+    <!-- 右侧内容区 -->
+    <div class="right-panel">
+      <!-- 欢迎页 -->
+      <div v-if="currentView === 'welcome'" class="welcome-view">
+        <div class="welcome-content">
+          <i class="el-icon-share" style="font-size: 80px; color: #1890ff;"></i>
+          <h2 style="margin: 20px 0;">网络拓扑管理</h2>
+          <p style="color: #999;">请从左侧选择或新建拓扑</p>
+        </div>
       </div>
 
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="dialogVisible = false">取 消</el-button>
-        <el-button v-if="!isEdit && detectionResults.length === 0" type="primary" @click="handleDetection" :loading="submitLoading">检 测</el-button>
-        <el-button v-if="!isEdit && detectionResults.length > 0" type="success" @click="handleBatchSubmit" :loading="submitLoading">提 交</el-button>
-        <el-button v-if="isEdit" type="primary" @click="handleSubmit" :loading="submitLoading">确 定</el-button>
-      </span>
-    </el-dialog>
+      <!-- 拓扑编辑视图 -->
+      <div v-if="currentView === 'edit'" class="edit-view">
+        <TopologyEditor
+          :topology-data="currentTopology"
+          @back="handleBackToWelcome"
+          @save="handleSaveTopology"
+          @node-click="handleNodeClick"
+          @link-click="handleLinkClick"
+          @view-detail="handleViewDetail"
+          @delete-node="handleDeleteNode"
+          @add-node="handleAddNode"
+          @add-link="handleAddLink"
+          @auto-layout="handleAutoLayout"
+          @build-from-lldp="handleBuildFromLLDP">
+        </TopologyEditor>
+      </div>
+    </div>
+
+    <!-- 新建/编辑拓扑对话框 -->
+    <TopologyFormDialog
+      :visible.sync="dialogVisible"
+      :mode="dialogMode"
+      :topology-data="dialogTopologyData"
+      :category-options="categoryPathOptions"
+      @submit="handleSubmitTopology">
+    </TopologyFormDialog>
   </div>
 </template>
 
 <script>
-import iplist_api from "@/api/mapis/iplist_interface.js"
-import collector_api from "@/api/mapis/collector_interface.js"
+import TopologyTree from './topology_components/TopologyTree.vue'
+import TopologyEditor from './topology_components/TopologyEditor.vue'
+import TopologyFormDialog from './topology_components/TopologyFormDialog.vue'
+import topologyApi from '@/api/mapis/topology_interface'
 
 export default {
+  name: 'TopologyManage',
+
   data() {
     return {
-      // table 用
-      multipleSelection: [],
-      table_currentPage: 1,
-      table_info: [],
-      table_info_show: [],
-      table_total: 0,
-      table_size: 20,
+      // 视图状态
+      currentView: 'welcome', // 'welcome' | 'edit'
 
-      // 筛选用
-      filter_search: "",
+      // 拓扑列表
+      topologyList: [],
 
-      isload: false,
+      // 当前编辑的拓扑
+      currentTopology: null,
 
       // 对话框
       dialogVisible: false,
-      dialogTitle: '新增设备',
-      isEdit: false,
-      submitLoading: false,
-
-      // 检测结果
-      detectionResults: [],
-
-      // 表单数据
-      formData: {
-        ip: '',
-        ip_list: '',
-        sysname: '',
-        community: 'vdiannet',
-        admin_status: '0'
-      },
-
-      // 表单验证规则
-      formRules: {
-        ip: [
-          { required: true, message: '请输入IP地址', trigger: 'blur' },
-          { pattern: /^(\d+\.){3}\d+$/, message: 'IP地址格式不正确', trigger: 'blur' }
-        ],
-        ip_list: [
-          { required: true, message: '请输入IP地址', trigger: 'blur' }
-        ],
-        sysname: [
-          { required: true, message: '请输入设备名称', trigger: 'blur' },
-          { min: 1, max: 300, message: '设备名称长度在1到300个字符', trigger: 'blur' }
-        ],
-        community: [
-          { required: true, message: '请输入Community', trigger: 'blur' },
-          { max: 100, message: 'Community长度不超过100个字符', trigger: 'blur' }
-        ],
-        admin_status: [
-          { required: true, message: '请选择管理状态', trigger: 'change' }
-        ]
-      }
+      dialogMode: 'create', // 'create' | 'edit'
+      dialogTopologyData: null,
+      categoryPathOptions: []
     }
   },
 
   mounted() {
-    this.getIpList()
+    this.loadTopologyList()
   },
 
   methods: {
-    // 表格自带方法
-    handleSelectionChange(val) {
-      this.multipleSelection = val
-    },
+    // ==================== 数据加载 ====================
 
-    // 修改页码
-    handleCurrentChange(val) {
-      this.table_currentPage = val
-      this.table_info_show = this.table_info.slice((this.table_currentPage - 1) * this.table_size, this.table_currentPage * this.table_size)
-    },
-
-    // 修改一页总数
-    handleSizeChange(val) {
-      this.table_size = val
-      this.table_info_show = this.table_info.slice((this.table_currentPage - 1) * this.table_size, this.table_currentPage * this.table_size)
-    },
-
-    // 获取设备IP清单列表
-    getIpList() {
-      let post_data = {}
-      this.filter_search = this.filter_search.replace(/^\s*|\s*$/g, "")
-      if (this.filter_search != "") {
-        post_data["search"] = this.filter_search
-      }
-
-      this.table_currentPage = 1
-      this.table_total = 0
-
-      let that = this
-      this.isload = true
-
-      iplist_api.getIpList(post_data, {}).then(function(response) {
-        if (response.data.code === 0) {
-          that.table_info = response.data.data || []
-          that.table_total = that.table_info.length
-          that.table_info_show = that.table_info.slice((that.table_currentPage - 1) * that.table_size, that.table_currentPage * that.table_size)
-        } else {
-          that.$message({
-            type: 'error',
-            message: '查询失败，请重试'
-          })
-        }
-        that.isload = false
-      }).catch(function(error) {
-        console.log(error)
-        that.isload = false
-        that.$message({
-          type: 'error',
-          message: '查询失败，请重试'
-        })
-      })
-    },
-
-    // 新增
-    handleAdd() {
-      this.dialogTitle = '新增设备'
-      this.isEdit = false
-      this.detectionResults = []
-      this.formData = {
-        ip: '',
-        ip_list: '',
-        sysname: '',
-        community: 'vdiannet',
-        admin_status: '0'
-      }
-      this.dialogVisible = true
-      this.$nextTick(() => {
-        if (this.$refs.ipForm) {
-          this.$refs.ipForm.clearValidate()
-        }
-      })
-    },
-
-    // 编辑
-    handleEdit(row) {
-      this.dialogTitle = '编辑设备'
-      this.isEdit = true
-      this.formData = {
-        ip: row.ip,
-        sysname: row.sysname,
-        community: row.community,
-        admin_status: row.admin_status
-      }
-      this.dialogVisible = true
-      this.$nextTick(() => {
-        if (this.$refs.ipForm) {
-          this.$refs.ipForm.clearValidate()
-        }
-      })
-    },
-
-    // 检测设备
-    handleDetection() {
-      this.$refs.ipForm.validate(valid => {
-        if (valid) {
-          this.submitLoading = true
-          this.detectionResults = []
-
-          // 解析IP列表
-          let ip_list = this.formData.ip_list.split('\n').map(ip => ip.trim()).filter(ip => ip !== '')
-
-          if (ip_list.length === 0) {
-            this.$message({
-              type: 'warning',
-              message: '请输入至少一个IP地址'
-            })
-            this.submitLoading = false
-            return
+    loadTopologyList() {
+      topologyApi.getTopologyList({})
+        .then(response => {
+          const res = response.data
+          if (res.code === 0) {
+            this.topologyList = res.data || []
+            this.buildCategoryPathOptions()
+          } else {
+            this.$message.error('加载拓扑列表失败: ' + res.message)
           }
-
-          let that = this
-          let community = this.formData.community || 'vdiannet'
-          let completedCount = 0
-
-          // 批量检测每个IP
-          ip_list.forEach(function(ip) {
-            let snmp_data = {
-              ip: ip,
-              community: community,
-              oid: '1.3.6.1.2.1.1.5.0'  // sysName OID
-            }
-
-            collector_api.getSNMPGET(snmp_data, {}).then(function(response) {
-              if (response.data.code === 0 && response.data.data) {
-                // SNMP验证成功，获取到设备名
-                that.detectionResults.push({
-                  ip: ip,
-                  sysname: response.data.data,
-                  status: 'success'
-                })
-              } else {
-                // SNMP验证失败
-                that.detectionResults.push({
-                  ip: ip,
-                  sysname: '获取失败',
-                  status: 'failed'
-                })
-              }
-              completedCount++
-              if (completedCount === ip_list.length) {
-                that.submitLoading = false
-                that.$message({
-                  type: 'info',
-                  message: `检测完成，成功: ${that.detectionResults.filter(r => r.status === 'success').length}，失败: ${that.detectionResults.filter(r => r.status === 'failed').length}`
-                })
-              }
-            }).catch(function(error) {
-              console.log(error)
-              that.detectionResults.push({
-                ip: ip,
-                sysname: '连接失败',
-                status: 'failed'
-              })
-              completedCount++
-              if (completedCount === ip_list.length) {
-                that.submitLoading = false
-                that.$message({
-                  type: 'info',
-                  message: `检测完成，成功: ${that.detectionResults.filter(r => r.status === 'success').length}，失败: ${that.detectionResults.filter(r => r.status === 'failed').length}`
-                })
-              }
-            })
-          })
-        }
-      })
+        })
+        .catch(error => {
+          console.error('加载拓扑列表失败:', error)
+          this.$message.error('加载拓扑列表失败')
+        })
     },
 
-    // 批量提交成功的设备
-    handleBatchSubmit() {
-      let successList = this.detectionResults.filter(r => r.status === 'success')
+    buildCategoryPathOptions() {
+      const pathSet = new Set()
 
-      if (successList.length === 0) {
-        this.$message({
-          type: 'warning',
-          message: '没有检测成功的设备可以提交'
-        })
-        return
-      }
+      this.topologyList.forEach(topo => {
+        const categories = topo.category_types || []
+        if (categories.length > 0) {
+          const path = categories.join('/')
+          pathSet.add(path)
+        }
+      })
 
-      this.submitLoading = true
-      let that = this
-      let community = this.formData.community || 'vdiannet'
-
-      // 构建设备列表
-      let deviceList = successList.map(device => ({
-        ip: device.ip,
-        sysname: device.sysname,
-        community: community,
-        admin_status: '0',
-        timestamp: Math.floor(Date.now() / 1000).toString()
+      this.categoryPathOptions = Array.from(pathSet).map(path => ({
+        label: path,
+        value: path
       }))
+    },
 
-      let post_data = {
-        ip_list: deviceList
-      }
+    // ==================== 拓扑CRUD操作 ====================
 
-      iplist_api.batchAddOrUpdateIp(post_data, {}).then(function(response) {
-        if (response.data.code === 0) {
-          that.$message({
-            type: 'success',
-            message: `批量处理完成，共 ${successList.length} 条`
-          })
-          that.dialogVisible = false
-          that.getIpList()
+    handleCreateTopology() {
+      this.dialogMode = 'create'
+      this.dialogTopologyData = null
+      this.dialogVisible = true
+    },
+
+    handleEditTopology(row) {
+      this.dialogMode = 'edit'
+      this.dialogTopologyData = row
+      this.dialogVisible = true
+    },
+
+    handleSubmitTopology(formData) {
+      const apiCall = this.dialogMode === 'create'
+        ? topologyApi.createTopology(formData)
+        : topologyApi.updateTopology(formData)
+
+      apiCall.then(response => {
+        const res = response.data
+        if (res.code === 0) {
+          this.$message.success(this.dialogMode === 'create' ? '创建成功' : '更新成功')
+          this.dialogVisible = false
+          this.loadTopologyList()
         } else {
-          that.$message({
-            type: 'error',
-            message: response.data.message || '批量处理失败'
-          })
+          this.$message.error(res.message || '操作失败')
         }
-        that.submitLoading = false
-      }).catch(function(error) {
-        console.log(error)
-        that.$message({
-          type: 'error',
-          message: '批量处理失败，请重试'
-        })
-        that.submitLoading = false
+      }).catch(error => {
+        console.error('提交拓扑失败:', error)
+        this.$message.error('操作失败')
       })
     },
 
-    // 提交表单（仅用于编辑）
-    handleSubmit() {
-      this.$refs.ipForm.validate(valid => {
-        if (valid) {
-          this.submitData()
-        }
-      })
-    },
-
-    // 提交数据（仅用于编辑）
-    submitData() {
-      this.submitLoading = true
-      let post_data = {
-        ip: this.formData.ip,
-        sysname: this.formData.sysname,
-        community: this.formData.community || 'vdiannet',
-        admin_status: this.formData.admin_status,
-        timestamp: Math.floor(Date.now() / 1000).toString()
-      }
-
-      let that = this
-
-      iplist_api.updateIp(post_data, {}).then(function(response) {
-        if (response.data.code === 0) {
-          that.$message({
-            type: 'success',
-            message: '修改成功'
-          })
-          that.dialogVisible = false
-          that.getIpList()
-        } else {
-          that.$message({
-            type: 'error',
-            message: response.data.message || '修改失败'
-          })
-        }
-        that.submitLoading = false
-      }).catch(function(error) {
-        console.log(error)
-        that.$message({
-          type: 'error',
-          message: '修改失败，请重试'
-        })
-        that.submitLoading = false
-      })
-    },
-
-    // 删除
-    handleDelete(row) {
-      this.$confirm(`确认删除设备 ${row.sysname} (${row.ip}) 吗？`, '提示', {
+    handleDeleteTopology(row) {
+      this.$confirm(`确定删除拓扑"${row.topology_name}"吗？`, '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
-        let post_data = {
-          ip: row.ip
-        }
-        let that = this
+        topologyApi.deleteTopology({ topology_id: row.topology_id })
+          .then(response => {
+            const res = response.data
+            if (res.code === 0) {
+              this.$message.success('删除成功')
 
-        iplist_api.deleteIp(post_data, {}).then(function(response) {
-          if (response.data.code === 0) {
-            that.$message({
-              type: 'success',
-              message: '删除成功'
-            })
-            that.getIpList()
-          } else {
-            that.$message({
-              type: 'error',
-              message: response.data.message || '删除失败'
-            })
-          }
-        }).catch(function(error) {
-          console.log(error)
-          that.$message({
-            type: 'error',
-            message: '删除失败，请重试'
+              // 如果删除的是当前打开的拓扑，返回欢迎页
+              if (this.currentTopology && this.currentTopology.topology_id === row.topology_id) {
+                this.handleBackToWelcome()
+              }
+
+              this.loadTopologyList()
+            } else {
+              this.$message.error(res.message || '删除失败')
+            }
           })
-        })
-      }).catch(() => {
-        // 取消删除
+          .catch(error => {
+            console.error('删除拓扑失败:', error)
+            this.$message.error('删除失败')
+          })
       })
     },
 
-    // 批量删除
-    handleBatchDelete() {
-      if (this.multipleSelection.length === 0) {
-        this.$message({
-          type: 'warning',
-          message: '请先选择要删除的数据'
-        })
-        return
-      }
+    // ==================== 拓扑编辑操作 ====================
 
-      this.$confirm(`确认删除选中的 ${this.multipleSelection.length} 条数据吗？`, '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
-        let post_data = {
-          ip_list: this.multipleSelection.map(item => item.ip)
-        }
-        let that = this
-
-        iplist_api.batchDeleteIp(post_data, {}).then(function(response) {
-          if (response.data.code === 0) {
-            that.$message({
-              type: 'success',
-              message: '批量删除成功'
-            })
-            that.getIpList()
-          } else {
-            that.$message({
-              type: 'error',
-              message: response.data.message || '批量删除失败'
-            })
-          }
-        }).catch(function(error) {
-          console.log(error)
-          that.$message({
-            type: 'error',
-            message: '批量删除失败，请重试'
-          })
-        })
-      }).catch(() => {
-        // 取消删除
-      })
+    handleOpenTopology(row) {
+      this.currentTopology = row
+      this.currentView = 'edit'
     },
 
-    // 格式化时间戳
-    formatTimestamp(timestamp) {
-      if (!timestamp || timestamp === '' || timestamp === '0') return '-'
+    handleBackToWelcome() {
+      this.currentView = 'welcome'
+      this.currentTopology = null
+    },
 
-      // 如果timestamp是秒级时间戳（10位），转换为毫秒
-      let ts = parseInt(timestamp)
-      if (ts < 10000000000) {
-        ts = ts * 1000
-      }
+    handleSaveTopology(topologyData) {
+      // TODO: 调用后端接口保存
+      console.log('保存拓扑', topologyData)
 
-      const date = new Date(ts)
+      setTimeout(() => {
+        this.$message.success('保存成功')
+        this.loadTopologyList()
+      }, 500)
+    },
 
-      // 检查日期是否有效
-      if (isNaN(date.getTime())) return '-'
+    // ==================== 拓扑画布交互 ====================
 
-      const y = date.getFullYear()
-      const m = String(date.getMonth() + 1).padStart(2, '0')
-      const d = String(date.getDate()).padStart(2, '0')
-      const h = String(date.getHours()).padStart(2, '0')
-      const min = String(date.getMinutes()).padStart(2, '0')
-      const s = String(date.getSeconds()).padStart(2, '0')
-      return `${y}-${m}-${d} ${h}:${min}:${s}`
+    handleNodeClick(node) {
+      console.log('节点点击', node)
+    },
+
+    handleLinkClick() {
+      console.log('连接点击')
+    },
+
+    handleViewDetail(data) {
+      this.$message.info('查看详情功能开发中...')
+    },
+
+    handleDeleteNode(data) {
+      this.$message.info('删除节点功能开发中...')
+    },
+
+    handleAddNode() {
+      this.$message.info('添加节点功能开发中...')
+    },
+
+    handleAddLink() {
+      this.$message.info('添加连接功能开发中...')
+    },
+
+    handleAutoLayout() {
+      this.$message.info('自动布局功能开发中...')
+    },
+
+    handleBuildFromLLDP() {
+      this.$message.info('从LLDP生成功能开发中...')
     }
+  },
+
+  components: {
+    TopologyTree,
+    TopologyEditor,
+    TopologyFormDialog
   }
 }
 </script>
 
-<style>
+<style scoped>
+.topology-manage-page {
+  display: flex;
+  height: calc(100vh - 100px);
+  background: #f0f2f5;
+}
+
+.left-panel {
+  width: 320px;
+  background: #fff;
+  border-right: 1px solid #e8e8e8;
+}
+
+.right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.welcome-view {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  margin: 10px;
+  border-radius: 4px;
+}
+
+.welcome-content {
+  text-align: center;
+}
+
+.edit-view {
+  flex: 1;
+  padding: 10px;
+  overflow: hidden;
+}
 </style>
