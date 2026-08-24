@@ -1,290 +1,231 @@
 <template>
-  <div class="topology-manage-page">
-    <!-- 左侧分类树（包含拓扑列表） -->
-    <div class="left-panel">
-      <TopologyTree
-        :topology-list="topologyList"
-        @create="handleCreateTopology"
-        @open="handleOpenTopology"
-        @edit="handleEditTopology"
-        @delete="handleDeleteTopology">
-      </TopologyTree>
+  <div class="flow-board">
+    <div class="toggle-search-bar">
+      <el-button size="mini" plain :icon="search_panel_visible ? 'el-icon-arrow-up' : 'el-icon-arrow-down'" @click="search_panel_visible=!search_panel_visible">
+        {{search_panel_visible ? '隐藏搜索' : '显示搜索'}}
+      </el-button>
     </div>
 
-    <!-- 右侧内容区 -->
-    <div class="right-panel">
-      <!-- 欢迎页 -->
-      <div v-if="currentView === 'welcome'" class="welcome-view">
-        <div class="welcome-content">
-          <i class="el-icon-share" style="font-size: 80px; color: #1890ff;"></i>
-          <h2 style="margin: 20px 0;">网络拓扑管理</h2>
-          <p style="color: #999;">请从左侧选择或新建拓扑</p>
+    <el-card v-show="search_panel_visible" shadow="never" class="search-card">
+      <el-form :inline="true" size="mini" @submit.native.prevent>
+        <el-form-item label="设备IP">
+          <el-input placeholder="设备IP" v-model="filter_ip" @keyup.enter.native="searchPorts" clearable></el-input>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :loading="isload" @click="searchPorts">搜索</el-button>
+        </el-form-item>
+      </el-form>
+
+      <el-form v-if="port_list.length>0" :inline="true" size="mini" class="table-filter-form">
+        <el-form-item label="端口名">
+          <el-input placeholder="端口名过滤" v-model="table_filter_ifname" clearable></el-input>
+        </el-form-item>
+        <el-form-item label="端口描述">
+          <el-input placeholder="端口描述过滤" v-model="table_filter_alias" clearable></el-input>
+        </el-form-item>
+      </el-form>
+
+      <el-table
+        v-if="port_list.length>0"
+        :data="filtered_port_list"
+        border
+        size="mini"
+        max-height="300"
+        style="width: 100%;">
+        <el-table-column prop="sysname" label="设备名" show-overflow-tooltip min-width="15" align="center"></el-table-column>
+        <el-table-column prop="ip" label="设备IP" show-overflow-tooltip min-width="12" align="center"></el-table-column>
+        <el-table-column prop="if_name" label="端口名" show-overflow-tooltip min-width="10" align="center"></el-table-column>
+        <el-table-column prop="alias" label="描述" show-overflow-tooltip min-width="15" align="center"></el-table-column>
+        <el-table-column prop="oper_statu" label="物理状态" :formatter="transOperStatu" min-width="8" align="center"></el-table-column>
+        <el-table-column label="操作" min-width="8" align="center">
+          <template v-slot="scope">
+            <el-button size="mini" type="success" plain @click="addCard(scope.row)">添加看板</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <div class="card-grid">
+      <el-card v-for="card in cards" :key="card.key" shadow="hover" class="flow-card">
+        <div slot="header" class="flow-card-header">
+          <span>{{card.port_info.sysname}} - {{card.port_info.if_name}}</span>
+          <el-button type="text" icon="el-icon-close" @click="removeCard(card.key)"></el-button>
         </div>
-      </div>
-
-      <!-- 拓扑编辑视图 -->
-      <div v-if="currentView === 'edit'" class="edit-view">
-        <TopologyEditor
-          :topology-data="currentTopology"
-          @back="handleBackToWelcome"
-          @save="handleSaveTopology"
-          @node-click="handleNodeClick"
-          @link-click="handleLinkClick"
-          @view-detail="handleViewDetail"
-          @delete-node="handleDeleteNode"
-          @add-node="handleAddNode"
-          @add-link="handleAddLink"
-          @auto-layout="handleAutoLayout"
-          @build-from-lldp="handleBuildFromLLDP">
-        </TopologyEditor>
-      </div>
+        <echart_flow
+          :chartsname="card.key"
+          :port_info="card.port_info"
+          :chartswidth="'100%'"
+          :chartsheight="'320px'"
+          :interval="card.interval">
+        </echart_flow>
+      </el-card>
     </div>
 
-    <!-- 新建/编辑拓扑对话框 -->
-    <TopologyFormDialog
-      :visible.sync="dialogVisible"
-      :mode="dialogMode"
-      :topology-data="dialogTopologyData"
-      :category-options="categoryPathOptions"
-      @submit="handleSubmitTopology">
-    </TopologyFormDialog>
+    <el-empty v-if="cards.length===0" description="暂无看板，从上方搜索结果中添加"></el-empty>
+
+    <el-dialog title="设置采集间隔" :visible.sync="interval_dialog_visible" width="360px">
+      <el-form label-width="90px" size="mini">
+        <el-form-item label="设备名">
+          <span>{{pending_row.sysname}}</span>
+        </el-form-item>
+        <el-form-item label="端口名">
+          <span>{{pending_row.if_name}}</span>
+        </el-form-item>
+        <el-form-item label="采集间隔(秒)">
+          <el-input-number v-model="pending_interval" :min="1" :max="300" size="mini"></el-input-number>
+        </el-form-item>
+      </el-form>
+      <span slot="footer">
+        <el-button size="mini" @click="interval_dialog_visible=false">取消</el-button>
+        <el-button size="mini" type="primary" @click="confirmAddCard">确定</el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import TopologyTree from './topology_components/TopologyTree.vue'
-import TopologyEditor from './topology_components/TopologyEditor.vue'
-import TopologyFormDialog from './topology_components/TopologyFormDialog.vue'
-import topologyApi from '@/api/mapis/topology_interface'
+import collector_api from "@/api/mapis/collector_interface.js"
+import echart_flow from "@/components/echarts/echart_single_flow.vue"
 
 export default {
-  name: 'TopologyManage',
-
+  components: {
+    echart_flow
+  },
+  computed: {
+    filtered_port_list() {
+      let ifname_kw = this.table_filter_ifname.trim().toLowerCase()
+      let alias_kw = this.table_filter_alias.trim().toLowerCase()
+      return this.port_list.filter(function (row) {
+        if (ifname_kw !== "" && !(row.if_name || "").toLowerCase().includes(ifname_kw)) {
+          return false
+        }
+        if (alias_kw !== "" && !(row.alias || "").toLowerCase().includes(alias_kw)) {
+          return false
+        }
+        return true
+      })
+    }
+  },
   data() {
     return {
-      // 视图状态
-      currentView: 'welcome', // 'welcome' | 'edit'
+      filter_ip: "",
 
-      // 拓扑列表
-      topologyList: [],
+      search_panel_visible: true,
 
-      // 当前编辑的拓扑
-      currentTopology: null,
+      isload: false,
+      port_list: [],
+      table_filter_ifname: "",
+      table_filter_alias: "",
 
-      // 对话框
-      dialogVisible: false,
-      dialogMode: 'create', // 'create' | 'edit'
-      dialogTopologyData: null,
-      categoryPathOptions: []
-    }
+      cards: [],
+      card_seq: 0,
+
+      interval_dialog_visible: false,
+      pending_row: {},
+      pending_interval: 15,
+    };
   },
-
-  mounted() {
-    this.loadTopologyList()
-  },
-
   methods: {
-    // ==================== 数据加载 ====================
+    searchPorts() {
+      this.filter_ip = this.filter_ip.trim()
+      if (this.filter_ip === "") {
+        this.$message({
+          type: 'error',
+          message: '请输入设备IP'
+        });
+        return
+      }
 
-    loadTopologyList() {
-      topologyApi.getTopologyList({})
-        .then(response => {
-          const res = response.data
-          if (res.code === 0) {
-            this.topologyList = res.data || []
-            this.buildCategoryPathOptions()
-          } else {
-            this.$message.error('加载拓扑列表失败: ' + res.message)
+      let that = this
+      this.isload = true
+      collector_api.getPorts_ex({ ip: this.filter_ip }, {}).then(function (response) {
+        if (response.data["code"] === 0) {
+          that.port_list = response.data["data"]
+          if (that.port_list.length === 0) {
+            that.$message({
+              type: 'warning',
+              message: '未查询到匹配的端口'
+            });
           }
-        })
-        .catch(error => {
-          console.error('加载拓扑列表失败:', error)
-          this.$message.error('加载拓扑列表失败')
-        })
-    },
-
-    buildCategoryPathOptions() {
-      const pathSet = new Set()
-
-      this.topologyList.forEach(topo => {
-        const categories = topo.category_types || []
-        if (categories.length > 0) {
-          const path = categories.join('/')
-          pathSet.add(path)
-        }
-      })
-
-      this.categoryPathOptions = Array.from(pathSet).map(path => ({
-        label: path,
-        value: path
-      }))
-    },
-
-    // ==================== 拓扑CRUD操作 ====================
-
-    handleCreateTopology() {
-      this.dialogMode = 'create'
-      this.dialogTopologyData = null
-      this.dialogVisible = true
-    },
-
-    handleEditTopology(row) {
-      this.dialogMode = 'edit'
-      this.dialogTopologyData = row
-      this.dialogVisible = true
-    },
-
-    handleSubmitTopology(formData) {
-      const apiCall = this.dialogMode === 'create'
-        ? topologyApi.createTopology(formData)
-        : topologyApi.updateTopology(formData)
-
-      apiCall.then(response => {
-        const res = response.data
-        if (res.code === 0) {
-          this.$message.success(this.dialogMode === 'create' ? '创建成功' : '更新成功')
-          this.dialogVisible = false
-          this.loadTopologyList()
         } else {
-          this.$message.error(res.message || '操作失败')
+          that.$message({
+            type: 'error',
+            message: '查询失败，请重试'
+          });
         }
-      }).catch(error => {
-        console.error('提交拓扑失败:', error)
-        this.$message.error('操作失败')
+        that.isload = false
+      }).catch(function (error) {
+        console.log(error)
+        that.isload = false
+        that.$message({
+          type: 'error',
+          message: '查询失败，请重试'
+        });
       })
     },
 
-    handleDeleteTopology(row) {
-      this.$confirm(`确定删除拓扑"${row.topology_name}"吗？`, '提示', {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }).then(() => {
-        topologyApi.deleteTopology({ topology_id: row.topology_id })
-          .then(response => {
-            const res = response.data
-            if (res.code === 0) {
-              this.$message.success('删除成功')
+    addCard(row) {
+      this.pending_row = row
+      this.pending_interval = 15
+      this.interval_dialog_visible = true
+    },
 
-              // 如果删除的是当前打开的拓扑，返回欢迎页
-              if (this.currentTopology && this.currentTopology.topology_id === row.topology_id) {
-                this.handleBackToWelcome()
-              }
+    confirmAddCard() {
+      this.card_seq += 1
+      let row = this.pending_row
+      this.cards.push({
+        key: "flow_board_card_" + this.card_seq,
+        interval: this.pending_interval,
+        port_info: {
+          ip: row["ip"],
+          if_name: row["if_name"],
+          port_id: row["port_id"],
+          sysname: row["sysname"],
+          alias: row["alias"] || "-",
+        }
+      })
+      this.interval_dialog_visible = false
+    },
 
-              this.loadTopologyList()
-            } else {
-              this.$message.error(res.message || '删除失败')
-            }
-          })
-          .catch(error => {
-            console.error('删除拓扑失败:', error)
-            this.$message.error('删除失败')
-          })
+    removeCard(key) {
+      this.cards = this.cards.filter(function (card) {
+        return card.key !== key
       })
     },
 
-    // ==================== 拓扑编辑操作 ====================
-
-    handleOpenTopology(row) {
-      this.currentTopology = row
-      this.currentView = 'edit'
+    transOperStatu(row) {
+      return row.oper_statu === '1' ? "up" : "down"
     },
-
-    handleBackToWelcome() {
-      this.currentView = 'welcome'
-      this.currentTopology = null
-    },
-
-    handleSaveTopology(topologyData) {
-      // TODO: 调用后端接口保存
-      console.log('保存拓扑', topologyData)
-
-      setTimeout(() => {
-        this.$message.success('保存成功')
-        this.loadTopologyList()
-      }, 500)
-    },
-
-    // ==================== 拓扑画布交互 ====================
-
-    handleNodeClick(node) {
-      console.log('节点点击', node)
-    },
-
-    handleLinkClick() {
-      console.log('连接点击')
-    },
-
-    handleViewDetail(data) {
-      this.$message.info('查看详情功能开发中...')
-    },
-
-    handleDeleteNode(data) {
-      this.$message.info('删除节点功能开发中...')
-    },
-
-    handleAddNode() {
-      this.$message.info('添加节点功能开发中...')
-    },
-
-    handleAddLink() {
-      this.$message.info('添加连接功能开发中...')
-    },
-
-    handleAutoLayout() {
-      this.$message.info('自动布局功能开发中...')
-    },
-
-    handleBuildFromLLDP() {
-      this.$message.info('从LLDP生成功能开发中...')
-    }
-  },
-
-  components: {
-    TopologyTree,
-    TopologyEditor,
-    TopologyFormDialog
   }
-}
+};
 </script>
 
-<style scoped>
-.topology-manage-page {
-  display: flex;
-  height: calc(100vh - 100px);
-  background: #f0f2f5;
-}
-
-.left-panel {
-  width: 320px;
-  background: #fff;
-  border-right: 1px solid #e8e8e8;
-}
-
-.right-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.welcome-view {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-  margin: 10px;
-  border-radius: 4px;
-}
-
-.welcome-content {
-  text-align: center;
-}
-
-.edit-view {
-  flex: 1;
+<style lang="scss" scoped>
+.flow-board {
   padding: 10px;
-  overflow: hidden;
+
+  .toggle-search-bar {
+    margin-bottom: 5px;
+  }
+
+  .search-card {
+    margin-bottom: 10px;
+  }
+
+  .card-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .flow-card {
+    width: 480px;
+  }
+
+  .flow-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
 }
 </style>

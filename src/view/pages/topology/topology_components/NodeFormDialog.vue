@@ -5,6 +5,24 @@
     width="500px"
     @close="handleClose">
     <el-form ref="form" :model="formData" :rules="rules" label-width="80px" size="small">
+      <el-form-item label="选择设备" prop="device" v-if="mode === 'create'">
+        <el-select
+          v-model="selectedDevice"
+          filterable
+          placeholder="请输入设备名称或IP搜索"
+          @change="handleDeviceSelect"
+          style="width: 100%;">
+          <el-option
+            v-for="item in deviceList"
+            :key="item.ip"
+            :label="`${item.sysname} (${item.ip})`"
+            :value="item.ip">
+            <span style="float: left">{{ item.sysname }}</span>
+            <span style="float: right; color: #8492a6; font-size: 12px">{{ item.ip }}</span>
+          </el-option>
+        </el-select>
+      </el-form-item>
+
       <el-form-item label="节点ID" prop="id">
         <el-input v-model="formData.id" placeholder="请输入节点ID（如：192.168.1.1）" :disabled="mode === 'edit'"></el-input>
       </el-form-item>
@@ -33,6 +51,8 @@
 </template>
 
 <script>
+import collectorApi from '@/api/mapis/collector_interface'
+
 export default {
   name: 'NodeFormDialog',
 
@@ -54,6 +74,12 @@ export default {
   data() {
     return {
       dialogVisible: false,
+      submitting: false,
+
+      // 设备搜索
+      selectedDevice: '',
+      deviceList: [],
+
       formData: {
         id: '',
         label: '',
@@ -70,8 +96,7 @@ export default {
         group: [
           { required: true, message: '请选择节点类型', trigger: 'change' }
         ]
-      },
-      submitting: false
+      }
     }
   },
 
@@ -80,6 +105,10 @@ export default {
       this.dialogVisible = val
       if (val) {
         this.initForm()
+        // 对话框打开时加载设备列表
+        if (this.mode === 'create' && this.deviceList.length === 0) {
+          this.loadDevices()
+        }
       }
     },
     dialogVisible(val) {
@@ -105,6 +134,7 @@ export default {
           group: 'switch',
           title: ''
         }
+        this.selectedDevice = ''
       }
 
       // 清除验证
@@ -113,6 +143,39 @@ export default {
           this.$refs.form.clearValidate()
         }
       })
+    },
+
+    loadDevices() {
+      // 加载全部设备列表
+      collectorApi.getDevs({})
+        .then(response => {
+          const res = response.data
+          if (res.code === 0) {
+            this.deviceList = res.data || []
+          } else {
+            this.$message.error('加载设备列表失败: ' + res.message)
+          }
+        })
+        .catch(error => {
+          console.error('加载设备列表失败:', error)
+          this.$message.error('加载设备列表失败')
+        })
+    },
+
+    handleDeviceSelect(ip) {
+      const device = this.deviceList.find(d => d.ip === ip)
+      if (device) {
+        this.formData.id = device.ip
+        this.formData.label = device.sysname
+        // 根据设备描述判断类型，默认为switch
+        const desc = (device.sysdesc || '').toLowerCase()
+        if (desc.includes('router')) {
+          this.formData.group = 'router'
+        } else {
+          this.formData.group = 'switch'
+        }
+        this.formData.title = `${device.sysname} (${device.ip})`
+      }
     },
 
     handleSubmit() {

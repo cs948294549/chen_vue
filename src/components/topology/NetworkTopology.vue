@@ -114,14 +114,10 @@
 				// create a network
 				let container = document.getElementById(this.toponame);
 
-				// 使用DataSet以支持动态更新
-				this.nodesDataSet = new vis.DataSet(nodes)
-				this.edgesDataSet = new vis.DataSet(edges)
-
 				// provide the data in the vis format
 				let data = {
-					nodes: this.nodesDataSet,
-					edges: this.edgesDataSet
+					nodes: nodes,
+					edges: edges
 				};
 				let options = {
 					edges: {
