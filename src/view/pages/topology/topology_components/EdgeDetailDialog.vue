@@ -183,8 +183,10 @@ export default {
       const to = this.edgeData.to
       const fromNode = this.nodeList.find(n => n.id === from)
       const toNode = this.nodeList.find(n => n.id === to)
-      const fromName = fromNode ? fromNode.label : ''
-      const toName = toNode ? toNode.label : ''
+
+      // 使用 meta.sysname 而不是 label，因为 label 可能被用户修改为友好名称
+      const fromName = fromNode && fromNode.meta && fromNode.meta.sysname ? fromNode.meta.sysname : (fromNode ? fromNode.label : '')
+      const toName = toNode && toNode.meta && toNode.meta.sysname ? toNode.meta.sysname : (toNode ? toNode.label : '')
 
       this.loading = true
 

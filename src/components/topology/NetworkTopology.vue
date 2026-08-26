@@ -9,6 +9,8 @@
   import switchSvg from '@/assets/topo/h3_switch_general.svg';
   import routerSvg from '@/assets/topo/h3_router_general.svg';
 
+  //node: {"id":"唯一ID", "label":"展示在图里的名称", "title":"悬浮节点展示的名称", "group": "设备的类型，用于区分展示图标，与组件group一致", "x": "坐标", "y": "坐标"}
+  //edge: {"id":"唯一ID,一般用from@to去标识", "from":"来源的nodeid", "to":"目的nodeid", "label": "线上展示的描述", "color": {"color":"#333"}}
 	export default {
 		props:{
 			//传递的json数据，填充表格
@@ -84,7 +86,7 @@
 		},
 		beforeDestroy() {
 			//删除定时器
-			console.log("清除定时器");
+			// console.log("清除定时器");
 			// clearInterval(this.timer);
 		},
 		methods: {
@@ -110,7 +112,7 @@
 				// this.getnodes = this.setposition(this.getnodes)
 				// let nodes = new vis.DataSet(this.getnodes);
 				// let edges = new vis.DataSet(this.getedgs);
-				console.log(edges)
+				// console.log(edges)
 				// create a network
 				let container = document.getElementById(this.toponame);
 

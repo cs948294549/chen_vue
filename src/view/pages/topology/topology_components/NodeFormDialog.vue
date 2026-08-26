@@ -27,8 +27,13 @@
         <el-input v-model="formData.id" placeholder="请输入节点ID（如：192.168.1.1）" :disabled="mode === 'edit'"></el-input>
       </el-form-item>
 
-      <el-form-item label="节点名称" prop="label">
-        <el-input v-model="formData.label" placeholder="请输入节点名称（如：Core-SW-01）"></el-input>
+      <el-form-item label="显示名称" prop="label">
+        <el-input v-model="formData.label" placeholder="请输入拓扑图上显示的名称（如：核心交换机）"></el-input>
+      </el-form-item>
+
+      <el-form-item label="设备名" prop="deviceName">
+        <el-input v-model="formData.deviceName" placeholder="请输入设备实际名称（用于搜索关联）"></el-input>
+        <div style="font-size: 12px; color: #909399; margin-top: 4px;">设备实际名称，用于搜索和关联，不影响拓扑图显示</div>
       </el-form-item>
 
       <el-form-item label="节点类型" prop="group">
@@ -83,15 +88,20 @@ export default {
       formData: {
         id: '',
         label: '',
+        deviceName: '',  // 设备实际名称（存储在 meta.sysname）
         group: 'switch',
-        title: ''
+        title: '',
+        meta: null  // 保存完整的 meta 数据
       },
       rules: {
         id: [
           { required: true, message: '请输入节点ID', trigger: 'blur' }
         ],
         label: [
-          { required: true, message: '请输入节点名称', trigger: 'blur' }
+          { required: true, message: '请输入显示名称', trigger: 'blur' }
+        ],
+        deviceName: [
+          { required: true, message: '请输入设备名', trigger: 'blur' }
         ],
         group: [
           { required: true, message: '请选择节点类型', trigger: 'change' }
@@ -124,15 +134,19 @@ export default {
         this.formData = {
           id: this.nodeData.id,
           label: this.nodeData.label || '',
+          deviceName: (this.nodeData.meta && this.nodeData.meta.sysname) || this.nodeData.label || '',  // 从 meta.sysname 读取
           group: this.nodeData.group || 'switch',
-          title: this.nodeData.title || ''
+          title: this.nodeData.title || '',
+          meta: this.nodeData.meta || null  // 保留原有的 meta 数据
         }
       } else {
         this.formData = {
           id: '',
           label: '',
+          deviceName: '',
           group: 'switch',
-          title: ''
+          title: '',
+          meta: null
         }
         this.selectedDevice = ''
       }
@@ -166,7 +180,8 @@ export default {
       const device = this.deviceList.find(d => d.ip === ip)
       if (device) {
         this.formData.id = device.ip
-        this.formData.label = device.sysname
+        this.formData.label = device.sysname  // 默认显示名称也使用设备名
+        this.formData.deviceName = device.sysname  // 设备实际名称
         // 根据设备描述判断类型，默认为switch
         const desc = (device.sysdesc || '').toLowerCase()
         if (desc.includes('router')) {
@@ -194,6 +209,42 @@ export default {
           if (this.formData.title) {
             nodeData.title = this.formData.title
           }
+
+          // 添加或保留 meta 元数据
+          if (this.formData.meta) {
+            // 如果 formData 中有 meta，更新 sysname 后使用
+            nodeData.meta = {
+              ...this.formData.meta,
+              sysname: this.formData.deviceName  // 更新设备名
+            }
+          } else {
+            // 如果没有 meta，尝试从设备列表获取或初始化
+            const device = this.deviceList.find(d => d.ip === this.formData.id)
+            if (device) {
+              nodeData.meta = {
+                ip: device.ip,
+                sysname: this.formData.deviceName,  // 使用用户输入的设备名
+                model: device.model || '',
+                vendor: device.vendor || '',
+                sysdesc: device.sysdesc || '',
+                location: device.location || ''
+              }
+            } else {
+              // 初始化基本的 meta 结构
+              nodeData.meta = {
+                ip: this.formData.id,
+                sysname: this.formData.deviceName,  // 使用用户输入的设备名
+                model: '',
+                vendor: '',
+                sysdesc: '',
+                location: ''
+              }
+            }
+          }
+
+          console.log('=== 提交的节点数据 ===')
+          console.log('模式:', this.mode)
+          console.log('节点数据:', JSON.stringify(nodeData, null, 2))
 
           this.$emit('submit', nodeData)
 

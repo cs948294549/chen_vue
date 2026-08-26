@@ -88,7 +88,7 @@
       :visible.sync="edgeDialogVisible"
       :mode="edgeDialogMode"
       :edgeData="currentEdge"
-      :nodeList="nodes"
+      :nodeList="nodesData"
       @submit="handleEdgeSubmit">
     </EdgeFormDialog>
 
@@ -96,7 +96,7 @@
     <EdgeDetailDialog
       :visible.sync="edgeDetailVisible"
       :edgeData="currentEdge"
-      :nodeList="nodes">
+      :nodeList="nodesData">
     </EdgeDetailDialog>
 
     <!-- 设备详情抽屉：只能通过关闭按钮关闭 -->

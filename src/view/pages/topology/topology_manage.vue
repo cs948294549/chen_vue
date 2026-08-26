@@ -214,15 +214,36 @@ export default {
           const res = response.data
           if (res.code === 0) {
             this.$message.success('保存成功')
-            // 更新当前拓扑的版本号和更新时间
-            if (this.currentTopology && res.data) {
-              this.currentTopology.version = res.data.version || this.currentTopology.version + 1
-              this.currentTopology.updated_at = res.data.updated_at
+            // 重新加载当前拓扑的详情，确保版本号等数据是最新的
+            if (this.currentTopology) {
+              topologyApi.getTopologyDetail({ topology_id: this.currentTopology.topology_id })
+                .then(detailResponse => {
+                  const detailRes = detailResponse.data
+                  if (detailRes.code === 0) {
+                    this.currentTopology = detailRes.data
+                  }
+                })
+                .catch(error => {
+                  console.error('重新加载拓扑详情失败:', error)
+                })
             }
             // 刷新列表
             this.loadTopologyList()
           } else if (res.message === '版本冲突，请刷新后重试') {
             this.$message.error('版本冲突，拓扑已被他人修改，请刷新后重试')
+            // 版本冲突时也重新加载详情
+            if (this.currentTopology) {
+              topologyApi.getTopologyDetail({ topology_id: this.currentTopology.topology_id })
+                .then(detailResponse => {
+                  const detailRes = detailResponse.data
+                  if (detailRes.code === 0) {
+                    this.currentTopology = detailRes.data
+                  }
+                })
+                .catch(error => {
+                  console.error('重新加载拓扑详情失败:', error)
+                })
+            }
             this.loadTopologyList()
           } else {
             this.$message.error('保存失败: ' + res.message)

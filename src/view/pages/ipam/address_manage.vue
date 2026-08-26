@@ -761,13 +761,13 @@ export default {
       let that = this
       this.net_data = []
       this.tree_loading = true  // 开始加载
-      console.log('开始加载，tree_loading:', this.tree_loading)
+      // console.log('开始加载，tree_loading:', this.tree_loading)
 
       ipam_api.getNetworkAddressTree(post_data, {}).then(function(response) {
-        console.log('接口返回:', response.data)
+        // console.log('接口返回:', response.data)
         if (response.data.code === 0) {
           that.net_data = response.data.data || []
-          console.log('设置数据，条数:', that.net_data.length)
+          // console.log('设置数据，条数:', that.net_data.length)
         } else {
           that.$message({
             type: 'error',
@@ -775,20 +775,20 @@ export default {
           })
         }
       }).catch(function(error) {
-        console.log(error)
+        // console.log(error)
         that.$message({
           type: 'error',
           message: '查询失败，请重试'
         })
       }).finally(function() {
         that.tree_loading = false  // 加载完成
-        console.log('加载完成，tree_loading:', that.tree_loading)
+        // console.log('加载完成，tree_loading:', that.tree_loading)
       })
     },
 
     // 删除网段
     del_address(info) {
-      console.log("删除网段====", JSON.stringify(info))
+      // console.log("删除网段====", JSON.stringify(info))
 
       this.$confirm('此操作将删除该记录, 是否继续?', '提示', {
         confirmButtonText: '确定',
@@ -815,7 +815,7 @@ export default {
             })
           }
         }).catch(function(error) {
-          console.log(error)
+          // console.log(error)
           that.$message({
             type: 'error',
             message: '删除失败，请重试'
@@ -828,7 +828,7 @@ export default {
 
     // 修改网段
     updateAddress() {
-      console.log("修改网段====", JSON.stringify(this.address_view_option))
+      // console.log("修改网段====", JSON.stringify(this.address_view_option))
       let that = this
       let post_data = {}
 
@@ -868,7 +868,7 @@ export default {
 
     // 新增网段
     createAddress() {
-      console.log("新增网段====", JSON.stringify(this.address_view_option))
+      // console.log("新增网段====", JSON.stringify(this.address_view_option))
       let that = this
       let post_data = {}
       let adds = this.address_view_option.netaddr.split("/")
@@ -884,7 +884,7 @@ export default {
       post_data["comment"] = this.address_view_option["comment"] || ""
       post_data["manage_user"] = this.address_view_option["manage_user"] || ""
 
-      console.log("提交数据====", JSON.stringify(post_data))
+      // console.log("提交数据====", JSON.stringify(post_data))
       ipam_api.addNetworkAddress(post_data, {}).then(function(response) {
         if (response.data.code === 0) {
           that.dialog_view_cfg = false
@@ -910,7 +910,7 @@ export default {
 
     // 计算网段范围
     cal_ip_address(net_addr) {
-      console.log("计算网段范围====", net_addr)
+      // console.log("计算网段范围====", net_addr)
       if (/(\d+\.){3}\d+\/\d+/.test(net_addr)) {
         this.address_view_option.netaddr = this.address_view_option.netaddr.replace(/^\s*|\s*$/g, "")
         let net_array = net_addr.split("/")
@@ -938,7 +938,7 @@ export default {
 
         this.address_view_option.start_ip = start_ip
         this.address_view_option.end_ip = end_ip
-        console.log(start_ip, end_ip)
+        // console.log(start_ip, end_ip)
 
         let cal_ip = start_ip + "/" + mask_str
         if (this.address_view_option.netaddr != cal_ip) {
@@ -987,7 +987,7 @@ export default {
 
     // 新增保留IP
     addReserveIp() {
-      console.log("新增保留IP====", JSON.stringify(this.reserve_ip_option))
+      // console.log("新增保留IP====", JSON.stringify(this.reserve_ip_option))
 
       if (!this.reserve_ip_option.ip_addr) {
         this.$message({
