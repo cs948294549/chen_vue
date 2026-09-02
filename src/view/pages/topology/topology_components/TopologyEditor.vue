@@ -635,36 +635,60 @@ export default {
           const targetMap = {}
           lldpList.forEach(item => {
             const targetIp = item.rem_ip
-            if (!targetIp || targetIp === nodeData.id) {
+            const targetName = item.rem_name
+
+            // 跳过自己连接到自己的情况
+            if (targetIp && targetIp === nodeData.id) {
               return
             }
-            if (!targetMap[targetIp]) {
-              targetMap[targetIp] = { ip: targetIp, name: item.rem_name, count: 0 }
+
+            // 必须有 IP 或设备名其中之一
+            if (!targetIp && !targetName) {
+              return
             }
-            targetMap[targetIp].count++
+
+            // 使用 IP 或设备名作为 key（优先 IP）
+            const key = targetIp || targetName
+            if (!targetMap[key]) {
+              targetMap[key] = { ip: targetIp, name: targetName, count: 0 }
+            }
+            targetMap[key].count++
           })
 
           let addedCount = 0
           Object.values(targetMap).forEach(target => {
             // 对端设备必须已存在于当前拓扑中才自动连接
-            const targetNode = this.nodesData.find(n => n.id === target.ip)
+            // 优先通过 IP 匹配，如果 IP 不存在则通过设备名（meta.sysname）匹配
+            let targetNode = null
+
+            if (target.ip) {
+              targetNode = this.nodesData.find(n => n.id === target.ip)
+            }
+
+            // 如果通过 IP 没找到，且有设备名，则通过 meta.sysname 匹配
+            if (!targetNode && target.name) {
+              targetNode = this.nodesData.find(n =>
+                n.meta && n.meta.sysname === target.name
+              )
+            }
+
             if (!targetNode) {
               return
             }
 
             // 双向检查连接是否已存在
             const existingEdge = this.edgesData.find(e =>
-              (e.from === nodeData.id && e.to === target.ip) ||
-              (e.from === target.ip && e.to === nodeData.id)
+              (e.from === nodeData.id && e.to === targetNode.id) ||
+              (e.from === targetNode.id && e.to === nodeData.id)
             )
             if (existingEdge) {
               return
             }
 
             this.edgesData.push({
-              id: `${nodeData.id}@${target.ip}`,
+              id: `${nodeData.id}@${targetNode.id}`,
               from: nodeData.id,
-              to: target.ip,
+              to: targetNode.id,
               label: target.count > 1 ? `${target.count}条线路` : '',
               color: { color: '#333333' }
             })
