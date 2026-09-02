@@ -618,6 +618,7 @@ export default {
       }
     },
 
+    
     autoConnectFromLLDP(nodeData) {
       collectorApi.getLLDPS({ loc_ip: `^${nodeData.id}$` })
         .then(response => {
