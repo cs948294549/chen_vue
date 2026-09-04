@@ -77,6 +77,7 @@
               <el-tag size="small" style="margin-left: 8px;" type="success">{{click_node_info.role}}</el-tag>
             </div>
             <div>
+              <el-button type="success" size="small" icon="el-icon-s-operation" @click="openAllocateDialog">分配子网段</el-button>
               <el-button type="warning" size="small" icon="el-icon-edit" @click="dialog_view_cfg_update=true;address_view_option=click_node_info">修改</el-button>
               <el-button type="danger" size="small" icon="el-icon-delete" @click="del_address(click_node_info)">删除</el-button>
             </div>
@@ -477,6 +478,174 @@
         </el-form-item>
       </el-form>
     </el-dialog>
+
+    <!-- 分配子网段对话框 -->
+    <el-dialog title="分配子网段" :visible.sync="dialog_allocate_subnet" width="90%" :close-on-click-modal="false">
+      <!-- 第一步：输入分配参数 -->
+      <div v-if="!allocate_subnets.length" style="padding: 20px;">
+        <el-alert
+          title="当前网段信息"
+          type="info"
+          :closable="false"
+          style="margin-bottom: 20px;">
+          <div style="font-size: 14px; line-height: 1.8;">
+            <div><strong>父网段：</strong>{{ click_node_info.ip }}/{{ click_node_info.mask }}</div>
+            <div><strong>IP范围：</strong>{{ intToIp(click_node_info.start_ip) }} - {{ intToIp(click_node_info.end_ip) }}</div>
+            <div><strong>总IP数：</strong>{{ click_node_info.end_ip - click_node_info.start_ip + 1 }} 个</div>
+            <div v-if="click_node_info.children && click_node_info.children.length"><strong>已有子网段：</strong>{{ click_node_info.children.length }} 个</div>
+          </div>
+        </el-alert>
+
+        <el-form :model="allocate_params" size="medium" label-width="140px" style="max-width: 600px;">
+          <el-form-item label="子网掩码长度">
+            <el-select v-model="allocate_params.target_mask" placeholder="请选择掩码长度" style="width: 300px;">
+              <el-option
+                v-for="mask in available_masks"
+                :key="mask"
+                :label="`/${mask} (每个网段 ${Math.pow(2, 32 - mask)} 个IP)`"
+                :value="mask">
+              </el-option>
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="起始IP地址">
+            <el-input
+              v-model="allocate_params.start_position"
+              placeholder="可选，不填则从网段起始位置分配"
+              style="width: 300px;"
+              clearable>
+            </el-input>
+            <div style="color: #909399; font-size: 12px; margin-top: 5px;">
+              指定从哪个IP地址开始分配（例如：{{ intToIp(click_node_info.start_ip) }}）
+            </div>
+          </el-form-item>
+
+          <el-form-item label="分配数量">
+            <el-input-number
+              v-model="allocate_params.count"
+              :min="1"
+              :max="10"
+              style="width: 300px;"
+              placeholder="最多10个">
+            </el-input-number>
+            <div style="color: #909399; font-size: 12px; margin-top: 5px;">最多一次性分配10个子网段</div>
+          </el-form-item>
+
+          <el-form-item>
+            <el-button type="primary" @click="calculateSubnets" icon="el-icon-s-operation">计算可分配网段</el-button>
+            <el-button @click="dialog_allocate_subnet=false">取消</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <!-- 第二步：展示并编辑分配结果 -->
+      <div v-else style="padding: 10px;">
+        <el-alert
+          :title="`找到 ${allocate_subnets.length} 个可分配的连续网段`"
+          type="success"
+          :closable="false"
+          style="margin-bottom: 15px;">
+          <div style="font-size: 12px; color: #67C23A;">
+            可以根据需要编辑各网段的属性，然后提交创建
+          </div>
+        </el-alert>
+
+        <el-table
+          :data="allocate_subnets"
+          border
+          stripe
+          style="width: 100%"
+          :header-cell-style="{background: '#F5F7FA', color: '#606266', fontWeight: '600'}">
+          <el-table-column type="index" label="序号" width="60" align="center"></el-table-column>
+
+          <el-table-column label="网段" width="150" align="center">
+            <template slot-scope="scope">
+              <span style="color: #409EFF; font-weight: 600;">{{ scope.row.ip }}/{{ scope.row.mask }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="IP范围" width="280">
+            <template slot-scope="scope">
+              <div style="font-size: 12px;">
+                {{ intToIp(scope.row.start_ip) }} - {{ intToIp(scope.row.end_ip) }}
+                <el-tag size="mini" type="info" style="margin-left: 5px;">
+                  {{ scope.row.end_ip - scope.row.start_ip + 1 }} 个IP
+                </el-tag>
+              </div>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="网关" width="140">
+            <template slot-scope="scope">
+              <el-input v-model="scope.row.gateway" size="mini" placeholder="可选"></el-input>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="区域" width="120">
+            <template slot-scope="scope">
+              <el-input v-model="scope.row.location" size="mini"></el-input>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="运营商" width="120">
+            <template slot-scope="scope">
+              <el-select v-model="scope.row.isp" size="mini" placeholder="选择" clearable>
+                <el-option v-for="item in isp_options" :key="item" :label="item" :value="item"></el-option>
+              </el-select>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="用途" width="140">
+            <template slot-scope="scope">
+              <el-input v-model="scope.row.role" size="mini"></el-input>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="业务标签" width="120">
+            <template slot-scope="scope">
+              <el-input v-model="scope.row.label" size="mini"></el-input>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="状态" width="110">
+            <template slot-scope="scope">
+              <el-select v-model="scope.row.status" size="mini">
+                <el-option v-for="(item, key) in address_status_options" :key="key" :label="item" :value="key"></el-option>
+              </el-select>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="描述" width="160">
+            <template slot-scope="scope">
+              <el-input v-model="scope.row.comment" size="mini" placeholder="可选"></el-input>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="管理员" width="120">
+            <template slot-scope="scope">
+              <el-input v-model="scope.row.manage_user" size="mini"></el-input>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="操作" width="100" align="center">
+            <template slot-scope="scope">
+              <el-button
+                type="danger"
+                size="mini"
+                icon="el-icon-delete"
+                circle
+                @click="removeAllocateSubnet(scope.$index)">
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div style="margin-top: 20px; text-align: right;">
+          <el-button @click="resetAllocate" icon="el-icon-refresh-left">重新计算</el-button>
+          <el-button type="primary" @click="submitAllocateSubnets" icon="el-icon-check">提交创建 ({{ allocate_subnets.length }}个)</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -525,7 +694,17 @@ export default {
 
       // 分页
       currentPage: 1,
-      pageSize: 100
+      pageSize: 100,
+
+      // 分配子网段
+      dialog_allocate_subnet: false,
+      allocate_params: {
+        target_mask: null,
+        count: 1,
+        start_position: ''
+      },
+      available_masks: [],
+      allocate_subnets: []
     }
   },
 
@@ -1111,6 +1290,279 @@ export default {
       }).catch(() => {
         // 取消删除
       })
+    },
+
+    // 打开分配子网段对话框
+    openAllocateDialog() {
+      // 验证当前网段掩码长度
+      const currentMask = parseInt(this.click_node_info.mask)
+      if (currentMask >= 30) {
+        this.$message({
+          type: 'warning',
+          message: '当前网段掩码长度已达到/30或更大，无法继续分配子网段'
+        })
+        return
+      }
+
+      // 生成可选的掩码长度（从当前掩码+1到30）
+      this.available_masks = []
+      for (let i = currentMask + 1; i <= 30; i++) {
+        this.available_masks.push(i)
+      }
+
+      // 重置参数
+      this.allocate_params = {
+        target_mask: currentMask + 1,
+        count: 1,
+        start_position: ''
+      }
+      this.allocate_subnets = []
+      this.dialog_allocate_subnet = true
+    },
+
+    // 计算可分配的子网段
+    calculateSubnets() {
+      if (!this.allocate_params.target_mask) {
+        this.$message({
+          type: 'warning',
+          message: '请选择子网掩码长度'
+        })
+        return
+      }
+
+      if (!this.allocate_params.count || this.allocate_params.count < 1 || this.allocate_params.count > 10) {
+        this.$message({
+          type: 'warning',
+          message: '分配数量必须在1-10之间'
+        })
+        return
+      }
+
+      const targetMask = parseInt(this.allocate_params.target_mask)
+      const count = parseInt(this.allocate_params.count)
+      const parentStartIp = parseInt(this.click_node_info.start_ip)
+      const parentEndIp = parseInt(this.click_node_info.end_ip)
+
+      // 计算子网段大小
+      const subnetSize = Math.pow(2, 32 - targetMask)
+
+      // 确定起始位置
+      let startIP = parentStartIp
+      if (this.allocate_params.start_position && this.allocate_params.start_position.trim()) {
+        // 验证起始IP格式
+        const startIpStr = this.allocate_params.start_position.trim()
+        if (!/^(\d+\.){3}\d+$/.test(startIpStr)) {
+          this.$message({
+            type: 'warning',
+            message: '起始IP地址格式不正确'
+          })
+          return
+        }
+
+        const specifiedStartIp = this.ipToInt(startIpStr)
+
+        // 验证起始IP是否在父网段范围内
+        if (specifiedStartIp < parentStartIp || specifiedStartIp > parentEndIp) {
+          this.$message({
+            type: 'warning',
+            message: `起始IP必须在父网段范围内 (${this.intToIp(parentStartIp)} - ${this.intToIp(parentEndIp)})`
+          })
+          return
+        }
+
+        startIP = specifiedStartIp
+      }
+
+      // 获取已占用的IP段
+      const occupiedRanges = []
+      if (this.click_node_info.children && this.click_node_info.children.length > 0) {
+        this.click_node_info.children.forEach(child => {
+          occupiedRanges.push({
+            start: parseInt(child.start_ip),
+            end: parseInt(child.end_ip)
+          })
+        })
+      }
+
+      // 从指定位置开始，寻找连续的可用空间
+      const availableSubnets = []
+      let currentIP = startIP
+
+      // 确保起始位置对齐到子网边界
+      const alignmentBase = parentStartIp
+      const offset = (currentIP - alignmentBase) % subnetSize
+      if (offset !== 0) {
+        currentIP += (subnetSize - offset)
+      }
+
+      while (currentIP + subnetSize - 1 <= parentEndIp && availableSubnets.length < count) {
+        const subnetEnd = currentIP + subnetSize - 1
+
+        // 检查是否与已有网段冲突
+        let isConflict = false
+        for (let range of occupiedRanges) {
+          if (!(subnetEnd < range.start || currentIP > range.end)) {
+            isConflict = true
+            break
+          }
+        }
+
+        if (!isConflict) {
+          // 计算网络地址
+          const networkIp = this.intToIp(currentIP)
+
+          availableSubnets.push({
+            ip: networkIp,
+            mask: targetMask,
+            start_ip: currentIP,
+            end_ip: subnetEnd,
+            // 继承父网段的字段
+            gateway: this.click_node_info.gateway || '',
+            location: this.click_node_info.location || '',
+            isp: this.click_node_info.isp || '',
+            role: this.click_node_info.role || '',
+            label: this.click_node_info.label || '',
+            status: this.click_node_info.status || '1',
+            comment: '',
+            manage_user: this.click_node_info.manage_user || ''
+          })
+        }
+
+        // 移动到下一个子网位置
+        currentIP += subnetSize
+      }
+
+      if (availableSubnets.length === 0) {
+        this.$message({
+          type: 'warning',
+          message: '从指定位置未找到可分配的连续网段，请尝试减少分配数量、选择更大的掩码长度或更改起始位置'
+        })
+        return
+      }
+
+      if (availableSubnets.length < count) {
+        this.$message({
+          type: 'warning',
+          message: `从指定位置仅找到 ${availableSubnets.length} 个可分配网段，少于请求的 ${count} 个`
+        })
+      }
+
+      this.allocate_subnets = availableSubnets
+    },
+
+    // 移除分配列表中的某个网段
+    removeAllocateSubnet(index) {
+      this.$confirm('确认删除这个待分配的网段吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        this.allocate_subnets.splice(index, 1)
+        if (this.allocate_subnets.length === 0) {
+          this.$message({
+            type: 'info',
+            message: '已清空分配列表'
+          })
+        }
+      }).catch(() => {})
+    },
+
+    // 重新计算
+    resetAllocate() {
+      this.allocate_subnets = []
+    },
+
+    // 提交创建子网段
+    submitAllocateSubnets() {
+      if (this.allocate_subnets.length === 0) {
+        this.$message({
+          type: 'warning',
+          message: '没有需要创建的网段'
+        })
+        return
+      }
+
+      this.$confirm(`确认创建 ${this.allocate_subnets.length} 个子网段吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        // 构建提交数据
+        const submitData = this.allocate_subnets.map(subnet => {
+          return {
+            ip: subnet.ip,
+            mask: subnet.mask.toString(),
+            gateway: subnet.gateway,
+            status: subnet.status,
+            location: subnet.location,
+            isp: subnet.isp,
+            role: subnet.role,
+            label: subnet.label,
+            comment: subnet.comment,
+            manage_user: subnet.manage_user
+          }
+        })
+
+        // 打印提交内容
+        console.log('==========批量创建网段提交数据==========')
+        console.log('提交数量：', submitData.length)
+        console.log('详细数据：', JSON.stringify(submitData, null, 2))
+        console.log('========================================')
+
+        // 显示加载提示
+        const loading = this.$loading({
+          lock: true,
+          text: `正在创建 ${submitData.length} 个网段...`,
+          spinner: 'el-icon-loading',
+          background: 'rgba(0, 0, 0, 0.7)'
+        })
+
+        // 调用批量创建接口
+        const that = this
+        ipam_api.batchAddNetworkAddress({ networks: submitData }, {})
+          .then(response => {
+            loading.close()
+
+            if (response.data.code === 0) {
+              const result = response.data.data
+
+              // 全部成功
+              that.$message({
+                type: 'success',
+                message: result.message,
+                duration: 3000
+              })
+
+              // 创建成功后刷新树并关闭对话框
+              that.dialog_allocate_subnet = false
+              that.allocate_subnets = []
+              that.getTreeNode()
+            } else {
+              // 失败情况，显示详细信息
+              const result = response.data.data
+              let errorMessage = result.message
+
+              if (result.failed_items && result.failed_items.length > 0) {
+                errorMessage += '\n\n失败详情:\n' +
+                  result.failed_items.map(item => `${item.ip}/${item.mask}: ${item.error}`).join('\n')
+              }
+
+              that.$alert(errorMessage, '批量创建失败', {
+                type: 'error',
+                confirmButtonText: '确定'
+              })
+            }
+          })
+          .catch(error => {
+            loading.close()
+            console.error('批量创建网段异常：', error)
+            that.$message({
+              type: 'error',
+              message: '批量创建失败，请重试',
+              duration: 3000
+            })
+          })
+      }).catch(() => {})
     }
   }
 }

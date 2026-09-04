@@ -9,6 +9,9 @@ export default {
   addNetworkAddress(data, params) {
     return axios.post("/ipam/add_address", data, params)
   },
+  batchAddNetworkAddress(data, params) {
+    return axios.post("/ipam/batch_add_address", data, params)
+  },
   updateNetworkAddress(data, params) {
     return axios.post("/ipam/update_address", data, params)
   },

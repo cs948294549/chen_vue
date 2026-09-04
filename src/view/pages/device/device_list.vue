@@ -85,10 +85,10 @@
           <el-form label-width="80px">
             <el-row :gutter="20">
               <el-col :span="12">
-                <el-form-item label="源版本" size="small">
-                  <el-select v-model="compare_src" placeholder="请选择源版本" style="width: 100%;" @change="handleCompareVersionChange">
+                <el-form-item label="历史版本" size="small">
+                  <el-select v-model="compare_src" placeholder="请选择历史版本" style="width: 100%;" @change="handleHistoryVersionChange">
                     <el-option
-                      v-for="item in config_list"
+                      v-for="item in historyVersionList"
                       :key="item.log_id"
                       :label="`#${item.log_id} - ${formatTime(item.updated_at)}`"
                       :value="item.log_id">
@@ -97,10 +97,10 @@
                 </el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item label="目标版本" size="small">
-                  <el-select v-model="compare_target" placeholder="请选择目标版本" style="width: 100%;" @change="handleCompareVersionChange">
+                <el-form-item label="当前版本" size="small">
+                  <el-select v-model="compare_target" placeholder="请选择当前版本" style="width: 100%;" @change="handleCurrentVersionChange">
                     <el-option
-                      v-for="item in config_list"
+                      v-for="item in currentVersionList"
                       :key="item.log_id"
                       :label="`#${item.log_id} - ${formatTime(item.updated_at)}`"
                       :value="item.log_id">
@@ -274,6 +274,30 @@
     computed: {
       can_compare() {
         return this.compare_src && this.compare_target && this.compare_src !== this.compare_target
+      },
+      // 历史版本列表：根据当前版本筛选，只显示比当前版本旧的版本
+      historyVersionList() {
+        if (!this.compare_target) {
+          return this.config_list
+        }
+        const targetIndex = this.config_list.findIndex(item => item.log_id === this.compare_target)
+        if (targetIndex === -1) {
+          return this.config_list
+        }
+        // 返回当前版本之后的所有版本（索引更大的是更旧的版本）
+        return this.config_list.slice(targetIndex + 1)
+      },
+      // 当前版本列表：根据历史版本筛选，只显示比历史版本新的版本
+      currentVersionList() {
+        if (!this.compare_src) {
+          return this.config_list
+        }
+        const srcIndex = this.config_list.findIndex(item => item.log_id === this.compare_src)
+        if (srcIndex === -1) {
+          return this.config_list
+        }
+        // 返回历史版本之前的所有版本（索引更小的是更新的版本）
+        return this.config_list.slice(0, srcIndex)
       }
     },
 
@@ -387,6 +411,14 @@
                 type: 'warning',
                 message: '该设备暂无配置备份记录'
               })
+            } else if (that.config_list.length >= 2) {
+              // 设置默认对比版本：目标版本为最新版本，源版本为上一个版本
+              that.compare_target = that.config_list[0].log_id
+              that.compare_src = that.config_list[1].log_id
+            } else if (that.config_list.length === 1) {
+              // 只有一个版本时，两者都选择第一个版本
+              that.compare_target = that.config_list[0].log_id
+              that.compare_src = that.config_list[0].log_id
             }
           } else {
             that.$message({
@@ -441,10 +473,34 @@
         return row.created_at === row.updated_at
       },
 
-      handleCompareVersionChange() {
-        // 版本选择变化时清空之前的对比结果
+      handleHistoryVersionChange() {
+        // 历史版本变化时，清空之前的对比结果
         this.diff_result = null
         this.diff_drawer_visible = false
+
+        // 如果选择的历史版本比当前版本新，清空当前版本选择
+        if (this.compare_target && this.compare_src) {
+          const srcIndex = this.config_list.findIndex(item => item.log_id === this.compare_src)
+          const targetIndex = this.config_list.findIndex(item => item.log_id === this.compare_target)
+          if (srcIndex <= targetIndex) {
+            this.compare_target = null
+          }
+        }
+      },
+
+      handleCurrentVersionChange() {
+        // 当前版本变化时，清空之前的对比结果
+        this.diff_result = null
+        this.diff_drawer_visible = false
+
+        // 如果选择的当前版本比历史版本旧，清空历史版本选择
+        if (this.compare_target && this.compare_src) {
+          const srcIndex = this.config_list.findIndex(item => item.log_id === this.compare_src)
+          const targetIndex = this.config_list.findIndex(item => item.log_id === this.compare_target)
+          if (targetIndex >= srcIndex) {
+            this.compare_src = null
+          }
+        }
       },
 
       handleDiffDrawerClose() {
