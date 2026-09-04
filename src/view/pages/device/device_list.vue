@@ -2,8 +2,9 @@
   <div>
     <!-- 搜索筛选区域 -->
     <div>
-      <div v-if="table_info.length>0">
+      <div v-if="table_info.length>0" style="margin-bottom: 10px;">
         <el-button type="primary" size="mini" @click="download_table">下载</el-button>
+        <el-button type="success" size="mini" @click="openCustomCompare">配置对比</el-button>
       </div>
       <el-row>
         <el-form style="text-align: right; margin-right: 5px;" size="mini" :inline="true">
@@ -215,6 +216,106 @@
         </el-card>
       </div>
     </el-drawer>
+
+    <!-- 自定义配置对比对话框 -->
+    <el-dialog
+      title="自定义配置对比"
+      :visible.sync="custom_compare_dialog_visible"
+      width="70%"
+      top="5vh"
+      :before-close="handleCustomCompareClose">
+      <el-form label-width="100px" size="small">
+        <el-card shadow="never" class="compare-device-card">
+          <div slot="header">历史版本</div>
+          <el-form-item label="设备选择">
+            <el-select
+              v-model="custom_compare_src_device"
+              placeholder="请选择或搜索设备"
+              filterable
+              @change="handleCustomSrcDeviceChange"
+              style="width: 100%;">
+              <el-option
+                v-for="item in table_info"
+                :key="item.ip"
+                :label="`${item.sysname} (${item.ip})`"
+                :value="item.ip">
+              </el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="配置版本" v-if="custom_src_config_list.length > 0">
+            <el-select
+              v-model="custom_compare_src_version"
+              placeholder="请选择配置版本"
+              style="width: 100%;"
+              v-loading="custom_src_loading">
+              <el-option
+                v-for="item in custom_src_config_list"
+                :key="item.log_id"
+                :label="`#${item.log_id} - ${formatTime(item.updated_at)}`"
+                :value="item.log_id">
+              </el-option>
+            </el-select>
+          </el-form-item>
+          <div v-if="custom_compare_src_device && custom_src_config_list.length === 0" style="color: #999; text-align: center; padding: 10px;">
+            该设备暂无配置备份记录
+          </div>
+        </el-card>
+
+        <el-card shadow="never" class="compare-device-card" style="margin-top: 15px;">
+          <div slot="header">当前版本</div>
+          <el-form-item label="设备选择">
+            <el-select
+              v-model="custom_compare_target_device"
+              placeholder="请选择或搜索设备"
+              filterable
+              @change="handleCustomTargetDeviceChange"
+              style="width: 100%;">
+              <el-option
+                v-for="item in table_info"
+                :key="item.ip"
+                :label="`${item.sysname} (${item.ip})`"
+                :value="item.ip">
+              </el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="配置版本" v-if="custom_target_config_list.length > 0">
+            <el-select
+              v-model="custom_compare_target_version"
+              placeholder="请选择配置版本"
+              style="width: 100%;"
+              v-loading="custom_target_loading">
+              <el-option
+                v-for="item in custom_target_config_list"
+                :key="item.log_id"
+                :label="`#${item.log_id} - ${formatTime(item.updated_at)}`"
+                :value="item.log_id">
+              </el-option>
+            </el-select>
+          </el-form-item>
+          <div v-if="custom_compare_target_device && custom_target_config_list.length === 0" style="color: #999; text-align: center; padding: 10px;">
+            该设备暂无配置备份记录
+          </div>
+        </el-card>
+
+        <el-form-item label="对比模式" style="margin-top: 20px;">
+          <el-radio-group v-model="custom_diff_mode">
+            <el-radio label="context">上下文对比（只显示变更部分）</el-radio>
+            <el-radio label="full">全文对比</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+
+      <span slot="footer">
+        <el-button size="small" @click="handleCustomCompareClose">取消</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          @click="handleCustomCompare"
+          :disabled="!canCustomCompare">
+          开始对比
+        </el-button>
+      </span>
+    </el-dialog>
   </div>
 </template>
 
@@ -268,6 +369,18 @@
         // 配置详情对话框
         detail_dialog_visible: false,
         config_detail_content: '',
+
+        // 自定义配置对比
+        custom_compare_dialog_visible: false,
+        custom_compare_src_device: null,
+        custom_compare_target_device: null,
+        custom_compare_src_version: null,
+        custom_compare_target_version: null,
+        custom_src_config_list: [],
+        custom_target_config_list: [],
+        custom_src_loading: false,
+        custom_target_loading: false,
+        custom_diff_mode: 'context',
       };
     },
 
@@ -298,6 +411,15 @@
         }
         // 返回历史版本之前的所有版本（索引更小的是更新的版本）
         return this.config_list.slice(0, srcIndex)
+      },
+      // 自定义对比是否可以执行
+      canCustomCompare() {
+        return this.custom_compare_src_device &&
+               this.custom_compare_target_device &&
+               this.custom_compare_src_version &&
+               this.custom_compare_target_version &&
+               (this.custom_compare_src_device !== this.custom_compare_target_device ||
+                this.custom_compare_src_version !== this.custom_compare_target_version)
       }
     },
 
@@ -681,6 +803,151 @@
         })
       },
 
+      // ==================== 自定义配置对比相关 ====================
+      openCustomCompare() {
+        this.custom_compare_dialog_visible = true
+        this.custom_compare_src_device = null
+        this.custom_compare_target_device = null
+        this.custom_compare_src_version = null
+        this.custom_compare_target_version = null
+        this.custom_src_config_list = []
+        this.custom_target_config_list = []
+        this.custom_diff_mode = 'context'
+      },
+
+      handleCustomCompareClose() {
+        this.custom_compare_dialog_visible = false
+      },
+
+      handleCustomSrcDeviceChange(ip) {
+        // 清空之前选择的版本
+        this.custom_compare_src_version = null
+        this.custom_src_config_list = []
+
+        if (!ip) {
+          return
+        }
+
+        // 加载设备的配置列表
+        this.custom_src_loading = true
+        let that = this
+        config_api.getConfigList({
+          ip: ip
+        }, {}).then(function(response) {
+          if (response.data && response.data.code === 0) {
+            that.custom_src_config_list = response.data.data || []
+            // 默认选择最新版本
+            if (that.custom_src_config_list.length > 0) {
+              that.custom_compare_src_version = that.custom_src_config_list[0].log_id
+            }
+          } else {
+            that.$message({
+              type: 'error',
+              message: '获取配置列表失败'
+            })
+          }
+          that.custom_src_loading = false
+        }).catch(function(error) {
+          console.log(error)
+          that.custom_src_loading = false
+          that.$message({
+            type: 'error',
+            message: '获取配置列表失败'
+          })
+        })
+      },
+
+      handleCustomTargetDeviceChange(ip) {
+        // 清空之前选择的版本
+        this.custom_compare_target_version = null
+        this.custom_target_config_list = []
+
+        if (!ip) {
+          return
+        }
+
+        // 加载设备的配置列表
+        this.custom_target_loading = true
+        let that = this
+        config_api.getConfigList({
+          ip: ip
+        }, {}).then(function(response) {
+          if (response.data && response.data.code === 0) {
+            that.custom_target_config_list = response.data.data || []
+            // 默认选择最新版本
+            if (that.custom_target_config_list.length > 0) {
+              that.custom_compare_target_version = that.custom_target_config_list[0].log_id
+            }
+          } else {
+            that.$message({
+              type: 'error',
+              message: '获取配置列表失败'
+            })
+          }
+          that.custom_target_loading = false
+        }).catch(function(error) {
+          console.log(error)
+          that.custom_target_loading = false
+          that.$message({
+            type: 'error',
+            message: '获取配置列表失败'
+          })
+        })
+      },
+
+      handleCustomCompare() {
+        if (!this.canCustomCompare) {
+          return
+        }
+
+        // 关闭对话框
+        this.custom_compare_dialog_visible = false
+
+        // 打开对比结果抽屉
+        this.diff_loading = true
+        this.diff_drawer_visible = true
+        this.diff_result = '<p style="text-align: center; color: #999;">正在对比配置，请稍候...</p>'
+
+        let that = this
+        let full_diff = this.custom_diff_mode === 'full'
+
+        config_api.compareConfigs({
+          src_id: this.custom_compare_src_version,
+          tar_id: this.custom_compare_target_version,
+          full_diff: full_diff
+        }, {}).then(function(response) {
+          if (response.data && response.data.code === 0) {
+            let result = response.data.data
+            that.diff_stats = result.stats || {
+              added: 0,
+              deleted: 0,
+              modified: 0
+            }
+            that.diff_result = result.html || '<p>无差异</p>'
+
+            that.$message({
+              type: 'success',
+              message: '配置对比完成'
+            })
+          } else {
+            that.diff_result = '<p style="color: #f56c6c;">配置对比失败</p>'
+            that.$message({
+              type: 'error',
+              message: '配置对比失败'
+            })
+          }
+          that.diff_loading = false
+        }).catch(function(error) {
+          console.log(error)
+          that.diff_result = '<p style="color: #f56c6c;">配置对比失败</p>'
+          that.diff_loading = false
+          that.$message({
+            type: 'error',
+            message: '配置对比失败'
+          })
+        })
+      },
+
       // ==================== Excel导出相关 ====================
       download_table:function(){
       	this.downloadExcl(this.table_info);
@@ -792,5 +1059,14 @@
 
 .config-list-card {
   margin-bottom: 20px;
+}
+
+.compare-device-card {
+  background-color: #fafafa;
+}
+
+.compare-device-card >>> .el-card__header {
+  background-color: #f0f0f0;
+  font-weight: bold;
 }
 </style>
