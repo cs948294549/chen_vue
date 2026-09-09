@@ -560,9 +560,9 @@ export default {
   },
 
   methods: {
-    // 返回
+    // 返回工单列表
     goBack() {
-      this.$router.go(-1)
+      this.$router.push({ path: '/pages/alteration/alteration_manage' })
     },
 
     // 是否可以回滚设备（单台设备）

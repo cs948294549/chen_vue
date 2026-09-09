@@ -218,11 +218,11 @@ export default {
       filters: {
         op_id: '',
         title: '',
-        status: [],
+        status: ['00', '01', '02', '10', '20'],  // 默认只显示进行中的工单
         username: '',
         op_type: '',
         create_time_range: null,
-        my_tasks: false
+        my_tasks: true  // 默认勾选"待我处理"
       },
 
       // 状态选项
@@ -305,12 +305,63 @@ export default {
     this.currentUser = (userInfo && userInfo.username) || localStorage.getItem('username') || ''
     this.currentRid = (userInfo && userInfo.rid) || localStorage.getItem('rid') || ''
 
+    // 加载保存的筛选条件
+    this.loadFilterFromStorage()
+
     this.loadTypeList()
     this.loadNotifyList()
     this.loadOrderList()
   },
 
+  beforeDestroy() {
+    // 离开页面时保存筛选条件
+    this.saveFilterToStorage()
+  },
+
   methods: {
+    // 从 localStorage 加载筛选条件
+    loadFilterFromStorage() {
+      try {
+        const savedFilter = localStorage.getItem('alteration_filter_conditions')
+        if (savedFilter) {
+          const filterData = JSON.parse(savedFilter)
+
+          // 恢复筛选条件
+          if (filterData.op_id) this.filters.op_id = filterData.op_id
+          if (filterData.title) this.filters.title = filterData.title
+          if (filterData.status && Array.isArray(filterData.status)) {
+            this.filters.status = filterData.status
+          }
+          if (filterData.username) this.filters.username = filterData.username
+          if (filterData.op_type) this.filters.op_type = filterData.op_type
+          if (filterData.create_time_range) this.filters.create_time_range = filterData.create_time_range
+          if (typeof filterData.my_tasks === 'boolean') {
+            this.filters.my_tasks = filterData.my_tasks
+          }
+        }
+      } catch (e) {
+        console.error('加载筛选条件失败:', e)
+      }
+    },
+
+    // 保存筛选条件到 localStorage
+    saveFilterToStorage() {
+      try {
+        const filterData = {
+          op_id: this.filters.op_id || '',
+          title: this.filters.title || '',
+          status: this.filters.status || [],
+          username: this.filters.username || '',
+          op_type: this.filters.op_type || '',
+          create_time_range: this.filters.create_time_range || null,
+          my_tasks: this.filters.my_tasks || false
+        }
+        localStorage.setItem('alteration_filter_conditions', JSON.stringify(filterData))
+      } catch (e) {
+        console.error('保存筛选条件失败:', e)
+      }
+    },
+
     // 加载工单类型列表
     loadTypeList() {
       alterationApi.getTypeList({}).then(response => {
@@ -382,11 +433,11 @@ export default {
       this.filters = {
         op_id: '',
         title: '',
-        status: [],
+        status: ['00', '01', '02', '10', '20'],  // 恢复默认状态筛选
         username: '',
         op_type: '',
         create_time_range: null,
-        my_tasks: false
+        my_tasks: true  // 恢复默认勾选"待我处理"
       }
       this.loadOrderList()
     },
