@@ -28,5 +28,10 @@ export default {
   // 删除配置记录
   deleteConfig(data, params) {
     return axios.post("/config/delete", data, params)
+  },
+
+  // 获取工单设备的配置对比
+  compareConfigByOrder(data, params) {
+    return axios.post("/config/compare_by_order", data, params)
   }
 }

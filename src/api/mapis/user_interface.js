@@ -41,6 +41,9 @@ export default {
   getUserList(data, params) {
     return axios.post("/system/get_user_list", data, params)
   },
+  getUserSimpleList(data, params) {
+    return axios.post("/system/get_user_simple_list", data, params)
+  },
   resetUserIdentify(data, params) {
     return axios.post("/system/reset_user_identify", data, params)
   },

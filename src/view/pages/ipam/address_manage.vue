@@ -7,7 +7,40 @@
             <i class="el-icon-s-grid" style="font-size: 24px; color: #409EFF; margin-right: 12px;"></i>
             <span style="font-size: 18px; font-weight: 600; color: #303133;">IP地址管理</span>
           </div>
-          <el-button type="primary" size="medium" icon="el-icon-plus" @click="dialog_view_cfg=true;address_view_option={}">新增网段</el-button>
+          <div>
+            <el-button
+              v-if="!batchDeleteMode"
+              type="primary"
+              size="medium"
+              icon="el-icon-plus"
+              @click="dialog_view_cfg=true;address_view_option={}">
+              新增网段
+            </el-button>
+            <el-button
+              v-if="!batchDeleteMode"
+              type="warning"
+              size="medium"
+              icon="el-icon-delete"
+              @click="enterBatchDeleteMode">
+              批量删除
+            </el-button>
+            <template v-if="batchDeleteMode">
+              <el-button
+                type="danger"
+                size="medium"
+                icon="el-icon-delete"
+                @click="batchDeleteNetworks"
+                :disabled="selectedNetworks.length === 0">
+                删除选中 ({{ selectedNetworks.length }})
+              </el-button>
+              <el-button
+                size="medium"
+                icon="el-icon-close"
+                @click="exitBatchDeleteMode">
+                取消
+              </el-button>
+            </template>
+          </div>
         </div>
       </el-card>
     </div>
@@ -42,6 +75,8 @@
               :default-expand-all="false"
               :expand-on-click-node="false"
               :highlight-current="true"
+              :show-checkbox="batchDeleteMode"
+              @check-change="handleCheckChange"
               :filter-node-method="filterNode">
               <span class="custom-tree-node" slot-scope="{ node, data }">
                 <span style="display: flex; align-items: center; width: 100%;">
@@ -704,7 +739,11 @@ export default {
         start_position: ''
       },
       available_masks: [],
-      allocate_subnets: []
+      allocate_subnets: [],
+
+      // 批量删除网段
+      selectedNetworks: [],
+      batchDeleteMode: false
     }
   },
 
@@ -1563,6 +1602,122 @@ export default {
             })
           })
       }).catch(() => {})
+    },
+
+    // 进入批量删除模式
+    enterBatchDeleteMode() {
+      this.batchDeleteMode = true
+      this.selectedNetworks = []
+      this.$message({
+        type: 'info',
+        message: '请在左侧网段树中勾选要删除的网段'
+      })
+    },
+
+    // 退出批量删除模式
+    exitBatchDeleteMode() {
+      this.batchDeleteMode = false
+      this.selectedNetworks = []
+      if (this.$refs.ipTree) {
+        this.$refs.ipTree.setCheckedKeys([])
+      }
+    },
+
+    // 处理树节点勾选变化
+    handleCheckChange() {
+      if (this.$refs.ipTree) {
+        this.selectedNetworks = this.$refs.ipTree.getCheckedNodes()
+      }
+    },
+
+    // 批量删除网段
+    batchDeleteNetworks() {
+      if (this.selectedNetworks.length === 0) {
+        this.$message({
+          type: 'warning',
+          message: '请先选择要删除的网段'
+        })
+        return
+      }
+
+      const deleteCount = this.selectedNetworks.length
+      const networkList = this.selectedNetworks.map(item => `${item.ip}/${item.mask}`).join('<br/>')
+
+      this.$confirm(
+        `确认删除以下 ${deleteCount} 个网段吗？<br/><br/>${networkList}<br/><br/><span style="color: #F56C6C;">注意：删除网段将同时删除该网段下的所有IP地址记录！</span>`,
+        '批量删除网段确认',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+          dangerouslyUseHTMLString: true
+        }
+      ).then(() => {
+        const loading = this.$loading({
+          lock: true,
+          text: `正在删除 ${deleteCount} 个网段...`,
+          spinner: 'el-icon-loading',
+          background: 'rgba(0, 0, 0, 0.7)'
+        })
+
+        const that = this
+        const deletePromises = this.selectedNetworks.map(network => {
+          return ipam_api.deleteNetworkAddress({
+            ip: network.ip,
+            mask: network.mask
+          }, {})
+        })
+
+        Promise.all(deletePromises)
+          .then(responses => {
+            loading.close()
+
+            // 统计成功和失败的数量
+            let successCount = 0
+            let failCount = 0
+            responses.forEach(response => {
+              if (response.data.code === 0) {
+                successCount++
+              } else {
+                failCount++
+              }
+            })
+
+            if (failCount === 0) {
+              that.$message({
+                type: 'success',
+                message: `成功删除 ${successCount} 个网段`,
+                duration: 3000
+              })
+            } else {
+              that.$message({
+                type: 'warning',
+                message: `删除完成：成功 ${successCount} 个，失败 ${failCount} 个`,
+                duration: 3000
+              })
+            }
+
+            // 退出批量删除模式
+            that.exitBatchDeleteMode()
+
+            // 清空当前选中节点
+            that.click_node_info = {}
+
+            // 刷新网段树
+            that.getTreeNode()
+          })
+          .catch(error => {
+            loading.close()
+            console.error('批量删除网段异常：', error)
+            that.$message({
+              type: 'error',
+              message: '批量删除失败，请重试',
+              duration: 3000
+            })
+          })
+      }).catch(() => {
+        // 取消删除
+      })
     }
   }
 }

@@ -1,740 +1,708 @@
 <template>
-  <div>
-    <!-- 搜索筛选区域 -->
-    <div>
-      <div v-if="table_info.length>0">
-        <el-button type="primary" size="mini" @click="download_table">下载</el-button>
-      </div>
-      <el-row>
-        <el-form style="text-align: right; margin-right: 5px;" size="mini" :inline="true">
-          <el-form-item label="设备IP">
-            <el-input placeholder="设备IP" v-model="filter_ip" @keyup.enter.native="getViews" clearable></el-input>
+  <div class="alteration-manage">
+    <!-- 筛选区域 -->
+    <el-card shadow="never" class="filter-card">
+      <el-form :inline="true" size="small">
+        <el-row>
+          <el-form-item label="工单ID">
+            <el-input v-model="filters.op_id" placeholder="工单ID" clearable style="width: 150px;"></el-input>
           </el-form-item>
-          <el-form-item label="设备名称">
-            <el-input placeholder="设备名称" v-model="filter_name" @keyup.enter.native="getViews" clearable></el-input>
+          <el-form-item label="工单标题">
+            <el-input v-model="filters.title" placeholder="标题关键字" clearable style="width: 200px;"></el-input>
           </el-form-item>
-          <el-form-item label="资产号">
-            <el-input placeholder="资产号" v-model="filter_assert" @keyup.enter.native="getViews" clearable></el-input>
+          <el-form-item label="工单状态">
+            <el-select v-model="filters.status" multiple placeholder="请选择状态" clearable style="width: 300px;">
+              <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value"></el-option>
+            </el-select>
           </el-form-item>
-          <el-form-item label="设备描述">
-            <el-input placeholder="描述" v-model="filter_desc" @keyup.enter.native="getViews" clearable></el-input>
+          <el-form-item label="创建人">
+            <el-input v-model="filters.username" placeholder="创建人" clearable style="width: 150px;"></el-input>
           </el-form-item>
-        </el-form>
-      </el-row>
-      <el-row>
-        <el-form style="text-align: right; margin-right: 5px;" size="mini" :inline="true">
-          <el-form-item label="型号">
-            <el-input placeholder="型号" v-model="filter_model" @keyup.enter.native="getViews" clearable></el-input>
+        </el-row>
+        <el-row>
+          <el-form-item label="工单类型">
+            <el-select v-model="filters.op_type" placeholder="请选择类型" clearable style="width: 200px;">
+              <el-option v-for="item in typeList" :key="item.pid" :label="item.name" :value="item.pid"></el-option>
+            </el-select>
           </el-form-item>
-          <el-form-item label="版本">
-            <el-input placeholder="版本" v-model="filter_version" @keyup.enter.native="getViews" clearable></el-input>
-          </el-form-item>
-          <el-form-item label="补丁">
-            <el-input placeholder="补丁" v-model="filter_feature" @keyup.enter.native="getViews" clearable></el-input>
+          <el-form-item label="创建时间">
+            <el-date-picker
+              v-model="filters.create_time_range"
+              type="datetimerange"
+              range-separator="至"
+              start-placeholder="开始时间"
+              end-placeholder="结束时间"
+              value-format="timestamp"
+              style="width: 360px;">
+            </el-date-picker>
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" :loading='isload' @click="getViews">筛选</el-button>
+            <el-checkbox v-model="filters.my_tasks">待我处理</el-checkbox>
           </el-form-item>
-        </el-form>
-      </el-row>
-    </div>
+          <el-form-item>
+            <el-button type="primary" :loading="loading" @click="loadOrderList">查询</el-button>
+            <el-button @click="resetFilters">重置</el-button>
+            <el-button type="success" @click="handleCreate">创建工单</el-button>
+          </el-form-item>
+        </el-row>
+      </el-form>
+    </el-card>
 
-    <!-- 设备列表表格 -->
-    <el-table border :data.sync='table_info_show' @selection-change="handleSelectionChange" :default-sort = "{prop: 'port_id'}" size="mini">
-      <el-table-column prop='sysname' label='设备名' show-overflow-tooltip min-width='28' align='center'>
-      </el-table-column>
-      <el-table-column prop='ip' label='设备IP' show-overflow-tooltip min-width='15' align='center'>
-      </el-table-column>
-      <el-table-column prop='syscontact' label='资产号' show-overflow-tooltip min-width='15' align='center'>
-      </el-table-column>
-      <el-table-column prop='hardware' label='型号' show-overflow-tooltip min-width='15' align='center'>
-      </el-table-column>
-      <el-table-column prop='features' label='补丁' show-overflow-tooltip min-width='15' align='center'>
-      </el-table-column>
-      <el-table-column prop='version' label='软件版本' show-overflow-tooltip min-width='15' align='center'>
-      </el-table-column>
-      <el-table-column prop='sysdesc' label='设备描述' show-overflow-tooltip min-width='20' align='center'>
-      </el-table-column>
-      <el-table-column prop='timestamp' label='采集时间' show-overflow-tooltip min-width='20' align='center'>
-      </el-table-column>
-      <el-table-column label='操作' min-width='12' align='center' fixed="right">
-        <template slot-scope="scope">
-          <el-button size="mini" type="primary" @click="handleViewConfig(scope.row)">查看配置</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <!-- 工单列表 -->
+    <el-card shadow="never" class="table-card">
+      <el-table
+        :data="orderList"
+        border
+        size="small"
+        v-loading="loading"
+        style="width: 100%">
+        <el-table-column prop="op_id" label="工单ID" width="80" align="center"></el-table-column>
+        <el-table-column prop="title" label="工单标题" min-width="200" show-overflow-tooltip></el-table-column>
+        <el-table-column label="工单类型" width="150" align="center">
+          <template slot-scope="scope">
+            {{ getTypeName(scope.row.op_type) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100" align="center">
+          <template slot-scope="scope">
+            <el-tag :type="getStatusType(scope.row.status)" size="small">
+              {{ getStatusText(scope.row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="username" label="创建人" width="100" align="center"></el-table-column>
+        <el-table-column label="创建时间" width="160" align="center">
+          <template slot-scope="scope">
+            {{ formatTime(scope.row.create_time) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="变更时间" width="180" align="center">
+          <template slot-scope="scope">
+            <span v-if="scope.row.begin_time">
+              {{ formatTime(scope.row.begin_time) }} ~ {{ formatTime(scope.row.finish_time) }}
+            </span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="当前处理人" width="120" align="center">
+          <template slot-scope="scope">
+            {{ scope.row.cur_user || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="280" align="center" fixed="right">
+          <template slot-scope="scope">
+            <el-button size="mini" type="text" @click="handleView(scope.row)">查看</el-button>
+            <el-button v-if="canEdit(scope.row)" size="mini" type="text" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button size="mini" type="text" @click="handleCopy(scope.row)">复制</el-button>
+            <el-button v-if="canDelete(scope.row)" size="mini" type="text" style="color: #f56c6c;" @click="handleDelete(scope.row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
-    <el-pagination @current-change='handleCurrentChange' :current-page='table_currentPage'  @size-change="handleSizeChange"
-    :page-sizes="[2, 20, 50, 100, 200, 500]" :page-size="table_size" layout='total, sizes, prev, pager, next' :total='table_total' style='float: right'></el-pagination><br/>
+      <el-pagination
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+        :current-page="pagination.page"
+        :page-sizes="[20, 50, 100, 200]"
+        :page-size="pagination.size"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="pagination.total"
+        style="margin-top: 20px; text-align: right;">
+      </el-pagination>
+    </el-card>
 
-    <!-- 配置查看抽屉 -->
-    <el-drawer
-      :title="'设备配置备份 - ' + current_device.sysname + ' (' + current_device.ip + ')'"
-      :visible.sync="drawer_visible"
-      direction="rtl"
-      size="80%"
-      :before-close="handleDrawerClose">
-
-      <div class="drawer-content">
-        <!-- 配置对比选择区域 -->
-        <el-card shadow="never" class="compare-card" v-if="config_list.length > 0">
-          <div slot="header" class="compare-header">
-            <span>配置对比</span>
-            <el-button size="mini" type="primary" :disabled="!can_compare" @click="handleCompare">开始对比</el-button>
-          </div>
-          <el-form label-width="80px">
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="源版本" size="small">
-                  <el-select v-model="compare_src" placeholder="请选择源版本" style="width: 100%;" @change="handleCompareVersionChange">
-                    <el-option
-                      v-for="item in config_list"
-                      :key="item.log_id"
-                      :label="`#${item.log_id} - ${formatTime(item.updated_at)}`"
-                      :value="item.log_id">
-                    </el-option>
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="目标版本" size="small">
-                  <el-select v-model="compare_target" placeholder="请选择目标版本" style="width: 100%;" @change="handleCompareVersionChange">
-                    <el-option
-                      v-for="item in config_list"
-                      :key="item.log_id"
-                      :label="`#${item.log_id} - ${formatTime(item.updated_at)}`"
-                      :value="item.log_id">
-                    </el-option>
-                  </el-select>
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-row>
-              <el-col :span="24">
-                <el-form-item label="对比模式" size="small">
-                  <el-radio-group v-model="diff_mode">
-                    <el-radio label="context">上下文对比（只显示变更部分）</el-radio>
-                    <el-radio label="full">全文对比</el-radio>
-                  </el-radio-group>
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-form>
-        </el-card>
-
-        <!-- 配置备份列表 -->
-        <el-card shadow="never" class="config-list-card">
-          <div slot="header">
-            <span>配置备份历史</span>
-          </div>
-          <el-table
-            :data="config_list"
-            border
-            size="small"
-            v-loading="config_loading"
-            style="width: 100%">
-            <el-table-column prop="log_id" label="序号" width="80" align="center"></el-table-column>
-            <el-table-column label="备份时间" min-width="160" align="center">
-              <template slot-scope="scope">
-                {{ formatTime(scope.row.updated_at) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="最早采集时间" min-width="160" align="center">
-              <template slot-scope="scope">
-                {{ isConfigChanged(scope.row) ? '-' : formatTime(scope.row.created_at) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="状态" width="100" align="center">
-              <template slot-scope="scope">
-                <el-tag size="small" :type="isConfigChanged(scope.row) ? 'success' : 'info'">
-                  {{ isConfigChanged(scope.row) ? '新采集' : '区间合并' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="备份类型" width="100" align="center">
-              <template slot-scope="scope">
-                <el-tag size="small" :type="getBackupTypeTag(getBackupType(scope.row.change_id))">
-                  {{ getBackupType(scope.row.change_id) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="备注" min-width="250" show-overflow-tooltip>
-              <template slot-scope="scope">
-                {{ getBackupNote(scope.row.change_id) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="200" align="center" fixed="right">
-              <template slot-scope="scope">
-                <el-button size="mini" type="text" @click="handleViewConfigDetail(scope.row)">查看</el-button>
-                <el-button size="mini" type="text" @click="handleDownloadConfig(scope.row)">下载</el-button>
-                <el-button size="mini" type="text" style="color: #f56c6c;" @click="handleDeleteConfig(scope.row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </div>
-    </el-drawer>
-
-    <!-- 配置详情对话框 -->
+    <!-- 创建/编辑工单对话框 -->
     <el-dialog
-      title="配置文件详情"
-      :visible.sync="detail_dialog_visible"
-      width="80%"
-      top="5vh">
-      <el-input
-        type="textarea"
-        v-model="config_detail_content"
-        :rows="25"
-        readonly
-        style="font-family: 'Courier New', monospace; font-size: 13px;">
-      </el-input>
-      <span slot="footer">
-        <el-button size="small" @click="detail_dialog_visible = false">关闭</el-button>
-        <el-button size="small" type="primary" @click="handleCopyConfig">复制</el-button>
-      </span>
+      :title="dialogTitle"
+      :visible.sync="dialogVisible"
+      width="60%"
+      :close-on-click-modal="false"
+      @close="handleDialogClose">
+      <el-form :model="orderForm" :rules="orderRules" ref="orderForm" label-width="120px" size="small">
+        <el-form-item label="工单类型" prop="op_type">
+          <el-select v-model="orderForm.op_type" placeholder="请选择工单类型" style="width: 100%;">
+            <el-option v-for="item in typeList" :key="item.pid" :label="item.name" :value="item.pid"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="工单标题" prop="title">
+          <el-input v-model="orderForm.title" placeholder="请输入工单标题"></el-input>
+        </el-form-item>
+        <el-form-item label="工单描述">
+          <el-input v-model="orderForm.descrip" type="textarea" :rows="4" placeholder="请输入工单描述"></el-input>
+        </el-form-item>
+        <el-form-item label="变更时间窗口" prop="time_range">
+          <el-date-picker
+            v-model="orderForm.time_range"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            value-format="timestamp"
+            style="width: 100%;"
+            @change="validateTimeWindow">
+          </el-date-picker>
+        </el-form-item>
+        <el-form-item label="指定执行人">
+          <el-input v-model="orderForm.assigner" placeholder="执行人邮箱前缀"></el-input>
+        </el-form-item>
+        <el-form-item label="通知群组">
+          <el-select v-model="orderForm.popo" placeholder="请选择通知群组" clearable style="width: 100%;">
+            <el-option v-for="item in notifyList" :key="item.pid" :label="item.name" :value="item.target"></el-option>
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button size="small" @click="dialogVisible = false">取消</el-button>
+        <el-button size="small" type="primary" :loading="submitting" @click="handleSave">保存</el-button>
+      </div>
     </el-dialog>
 
-    <!-- 配置对比结果抽屉 -->
-    <el-drawer
-      title="配置对比结果"
-      :visible.sync="diff_drawer_visible"
-      direction="rtl"
-      size="90%"
-      :before-close="handleDiffDrawerClose">
-      <div class="drawer-content">
-        <el-card shadow="never" class="diff-result-card">
-          <div slot="header" class="diff-header">
-            <span>对比统计</span>
-            <div>
-              <el-tag size="small" type="success">新增: {{ diff_stats.added }}</el-tag>
-              <el-tag size="small" type="danger" style="margin-left: 10px;">删除: {{ diff_stats.deleted }}</el-tag>
-              <el-tag size="small" type="warning" style="margin-left: 10px;">修改: {{ diff_stats.modified }}</el-tag>
-            </div>
-          </div>
-          <div class="diff-content" v-html="diff_result" v-loading="diff_loading"></div>
-        </el-card>
+    <!-- 提交工单确认对话框 -->
+    <el-dialog
+      title="提交工单"
+      :visible.sync="submitDialogVisible"
+      width="400px">
+      <p>确认提交工单 #{{ currentOrder.op_id }} 吗？</p>
+      <p style="color: #909399; font-size: 12px;">提交后工单将进入审批流程</p>
+      <div slot="footer">
+        <el-button size="small" @click="submitDialogVisible = false">取消</el-button>
+        <el-button size="small" type="primary" :loading="submitting" @click="confirmSubmit">确认提交</el-button>
       </div>
-    </el-drawer>
+    </el-dialog>
+
+    <!-- 接手工单确认对话框 -->
+    <el-dialog
+      title="接手工单"
+      :visible.sync="takeoverDialogVisible"
+      width="400px">
+      <p>确认接手工单 #{{ currentOrder.op_id }} 吗？</p>
+      <p style="color: #909399; font-size: 12px;">接手后将由您负责审批此工单</p>
+      <div slot="footer">
+        <el-button size="small" @click="takeoverDialogVisible = false">取消</el-button>
+        <el-button size="small" type="primary" :loading="submitting" @click="confirmTakeover">确认接手</el-button>
+      </div>
+    </el-dialog>
+
+    <!-- 审批对话框 -->
+    <el-dialog
+      title="工单审批"
+      :visible.sync="approveDialogVisible"
+      width="400px">
+      <el-form :model="approveForm" label-width="80px" size="small">
+        <el-form-item label="审批结果">
+          <el-radio-group v-model="approveForm.status">
+            <el-radio label="10">通过</el-radio>
+            <el-radio label="92">拒绝</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button size="small" @click="approveDialogVisible = false">取消</el-button>
+        <el-button size="small" type="primary" :loading="submitting" @click="confirmApprove">确认</el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-  import collector_api from "@/api/mapis/collector_interface.js"
-  import config_api from "@/api/mapis/config_interface.js"
-  import XLSX from 'xlsx'
+import alterationApi from '@/api/mapis/alteration_interface'
 
-  export default {
-    components:{},
-    data() {
-      return {
-        //table 用
-        multipleSelection:"",
-        table_currentPage:1,
-        table_info:[],
-        table_info_show:[],
-        table_total:0,
-        table_size:20,
+export default {
+  name: 'AlterationManage',
+  data() {
+    return {
+      loading: false,
+      submitting: false,
 
-        //筛选用
-        filter_ip:"",
-        filter_name:"",
-        filter_desc:"",
-        filter_assert: "",
-        filter_model:"",
-        filter_version:"",
-        filter_feature:"",
+      // 筛选条件
+      filters: {
+        op_id: '',
+        title: '',
+        status: [],
+        username: '',
+        op_type: '',
+        create_time_range: null,
+        my_tasks: false
+      },
 
-        isload: false,
+      // 状态选项
+      statusOptions: [
+        { value: '00', label: '草稿' },
+        { value: '01', label: '待接手' },
+        { value: '02', label: '待审批' },
+        { value: '10', label: '审批通过' },
+        { value: '20', label: '待变更' },
+        { value: '21', label: '变更中' },
+        { value: '90', label: '变更完成' },
+        { value: '91', label: '变更失败' },
+        { value: '92', label: '审批拒绝' },
+        { value: '93', label: '变更取消' }
+      ],
 
-        // 配置查看抽屉相关
-        drawer_visible: false,
-        current_device: {},
-        config_list: [],
-        config_loading: false,
+      // 工单类型列表
+      typeList: [],
 
-        // 配置对比相关
-        compare_src: null,
-        compare_target: null,
-        diff_mode: 'context',  // 对比模式：context=上下文对比，full=全文对比
-        diff_result: null,
-        diff_stats: {
-          added: 0,
-          deleted: 0,
-          modified: 0
-        },
-        diff_drawer_visible: false,
-        diff_loading: false,
+      // 通知群组列表
+      notifyList: [],
 
-        // 配置详情对话框
-        detail_dialog_visible: false,
-        config_detail_content: '',
-      };
+      // 工单列表
+      orderList: [],
+
+      // 分页
+      pagination: {
+        page: 1,
+        size: 20,
+        total: 0
+      },
+
+      // 对话框
+      dialogVisible: false,
+      dialogTitle: '创建工单',
+      isEdit: false,
+
+      // 工单表单
+      orderForm: {
+        op_id: null,
+        op_type: '',
+        title: '',
+        descrip: '',
+        time_range: null,
+        assigner: '',
+        popo: ''
+      },
+
+      // 表单验证规则
+      orderRules: {
+        op_type: [{ required: true, message: '请选择工单类型', trigger: 'change' }],
+        title: [{ required: true, message: '请输入工单标题', trigger: 'blur' }],
+        time_range: [{ required: true, message: '请选择变更时间窗口', trigger: 'change' }]
+      },
+
+      // 当前操作的工单
+      currentOrder: {},
+
+      // 提交对话框
+      submitDialogVisible: false,
+
+      // 接手对话框
+      takeoverDialogVisible: false,
+
+      // 审批对话框
+      approveDialogVisible: false,
+      approveForm: {
+        status: '10'
+      },
+
+      // 当前用户
+      currentUser: '',
+      currentRid: ''
+    }
+  },
+
+  mounted() {
+    // 从 store 获取用户信息
+    const userInfo = this.$store.getters["user/user_info"]
+    this.currentUser = (userInfo && userInfo.username) || localStorage.getItem('username') || ''
+    this.currentRid = (userInfo && userInfo.rid) || localStorage.getItem('rid') || ''
+
+    this.loadTypeList()
+    this.loadNotifyList()
+    this.loadOrderList()
+  },
+
+  methods: {
+    // 加载工单类型列表
+    loadTypeList() {
+      alterationApi.getTypeList({}).then(response => {
+        if (response.data.code === 0) {
+          this.typeList = response.data.data || []
+        }
+      }).catch(error => {
+        console.error('加载工单类型失败:', error)
+      })
     },
 
-    computed: {
-      can_compare() {
-        return this.compare_src && this.compare_target && this.compare_src !== this.compare_target
+    // 加载通知群组列表
+    loadNotifyList() {
+      alterationApi.getNotifyList({}).then(response => {
+        if (response.data.code === 0) {
+          this.notifyList = response.data.data || []
+        }
+      }).catch(error => {
+        console.error('加载通知群组失败:', error)
+      })
+    },
+
+    // 加载工单列表
+    loadOrderList() {
+      this.loading = true
+
+      let params = {}
+
+      if (this.filters.op_id) {
+        params.op_id = this.filters.op_id
+      }
+      if (this.filters.title) {
+        params.title = this.filters.title
+      }
+      if (this.filters.status && this.filters.status.length > 0) {
+        params.status = this.filters.status
+      }
+      if (this.filters.username) {
+        params.username = this.filters.username
+      }
+      if (this.filters.op_type) {
+        params.op_type = this.filters.op_type
+      }
+      if (this.filters.create_time_range && this.filters.create_time_range.length === 2) {
+        params.create_time_start = String(Math.floor(this.filters.create_time_range[0] / 1000))
+        params.create_time_end = String(Math.floor(this.filters.create_time_range[1] / 1000))
+      }
+      if (this.filters.my_tasks) {
+        params.cur_user = this.currentUser
+      }
+
+      alterationApi.getOrderList(params).then(response => {
+        if (response.data.code === 0) {
+          this.orderList = response.data.data || []
+          this.pagination.total = this.orderList.length
+        } else {
+          this.$message.error(response.data.message || '加载工单列表失败')
+        }
+        this.loading = false
+      }).catch(error => {
+        console.error('加载工单列表失败:', error)
+        this.$message.error('加载工单列表失败')
+        this.loading = false
+      })
+    },
+
+    // 重置筛选条件
+    resetFilters() {
+      this.filters = {
+        op_id: '',
+        title: '',
+        status: [],
+        username: '',
+        op_type: '',
+        create_time_range: null,
+        my_tasks: false
+      }
+      this.loadOrderList()
+    },
+
+    // 分页
+    handleSizeChange(val) {
+      this.pagination.size = val
+    },
+
+    handleCurrentChange(val) {
+      this.pagination.page = val
+    },
+
+    // 获取工单类型名称
+    getTypeName(typeId) {
+      let type = this.typeList.find(t => t.pid === typeId)
+      return type ? type.name : '-'
+    },
+
+    // 获取状态文本
+    getStatusText(status) {
+      let option = this.statusOptions.find(s => s.value === status)
+      return option ? option.label : status
+    },
+
+    // 获取状态标签类型
+    getStatusType(status) {
+      const typeMap = {
+        '00': 'info',
+        '01': 'warning',
+        '02': 'warning',
+        '10': 'success',
+        '20': 'primary',
+        '21': 'primary',
+        '90': 'success',
+        '91': 'danger',
+        '92': 'danger',
+        '93': 'info'
+      }
+      return typeMap[status] || 'info'
+    },
+
+    // 格式化时间
+    formatTime(timestamp) {
+      if (!timestamp) return '-'
+      let date = new Date(parseInt(timestamp) * 1000)
+      let pad = n => String(n).padStart(2, '0')
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+    },
+
+    // 验证时间窗口
+    validateTimeWindow(value) {
+      if (!value || value.length !== 2) return
+
+      let start = new Date(value[0])
+      let end = new Date(value[1])
+      let duration = (end - start) / 1000 / 3600 // 小时
+
+      // 检查是否在凌晨2-6点
+      let startHour = start.getHours()
+      let endHour = end.getHours()
+
+      if ((startHour < 2 || startHour >= 6) || (endHour < 2 || endHour > 6)) {
+        this.$message.warning('建议变更时间窗口在凌晨2:00-6:00之间')
+      }
+
+      // 检查时长
+      if (duration > 4) {
+        this.$message.warning('建议变更时长不超过4小时')
       }
     },
 
-    mounted() {
+    // 权限判断
+    canEdit(row) {
+      // 只能编辑草稿状态且是自己创建的工单
+      return row.status === '00' && row.username === this.currentUser
     },
-    methods: {
-      //表格自带方法
-      handleSelectionChange(val){
-        //表项多选
-        this.multipleSelection = val;
-      },
-      //修改页码
-      handleCurrentChange (val) {
-        this.table_currentPage = val
-        this.table_info_show = this.table_info.slice((this.table_currentPage-1)*this.table_size,this.table_currentPage*this.table_size)
-      },
-      //修改一页总数
-      handleSizeChange(val){
-        this.table_size = val
-        this.table_info_show = this.table_info.slice((this.table_currentPage-1)*this.table_size,this.table_currentPage*this.table_size)
-      },
 
-      getViews(){
-        let post_data = {}
-        this.filter_ip = this.filter_ip.replace(/^\s*|\s*$/g,"")
-        if(this.filter_ip!=""){
-          post_data["ip"]=this.filter_ip
-        }
-        this.filter_name = this.filter_name.replace(/^\s*|\s*$/g,"")
-        if(this.filter_name!=""){
-          post_data["sysname"]=this.filter_name
-        }
-        this.filter_desc = this.filter_desc.replace(/^\s*|\s*$/g,"")
-        if(this.filter_desc!=""){
-          post_data["sysdesc_reg"]=this.filter_desc
-        }
-        this.filter_assert = this.filter_assert.replace(/^\s*|\s*$/g,"")
-        if(this.filter_assert!=""){
-          post_data["syscontact"]=this.filter_assert
-        }
-
-        this.filter_model = this.filter_model.replace(/^\s*|\s*$/g,"")
-        if(this.filter_model!=""){
-          post_data["hardware"]=this.filter_model
-        }
-
-        this.filter_version = this.filter_version.replace(/^\s*|\s*$/g,"")
-        if(this.filter_version!=""){
-          post_data["version"]=this.filter_version
-        }
-
-        this.filter_feature = this.filter_feature.replace(/^\s*|\s*$/g,"")
-        if(this.filter_feature!=""){
-          post_data["features"]=this.filter_feature
-        }
-
-        this.table_currentPage=1;
-        this.table_total=0;
-        this.table_size=20;
-
-        let that = this
-        this.isload=true
-        collector_api.getDevs(post_data,{}).then(function(response){
-          if(response.data!="failed"){
-            that.table_info = response.data["data"]
-            that.table_total = that.table_info.length
-            that.table_info_show = that.table_info.slice((that.table_currentPage-1)*that.table_size,that.table_currentPage*that.table_size)
-          }else{
-            that.$message({
-              type: 'error',
-              message: '查询失败，请重试'
-            });
-          }
-          that.isload=false
-        }).catch(function (error) {
-            console.log(error)
-            that.isload=false
-            that.$message({
-              type: 'error',
-              message: '查询失败，请重试'
-            });
-        })
-      },
-
-      // ==================== 配置查看相关 ====================
-      handleViewConfig(row) {
-        this.current_device = {
-          sysname: row.sysname,
-          ip: row.ip,
-          hardware: row.hardware
-        }
-        this.drawer_visible = true
-        this.compare_src = null
-        this.compare_target = null
-        this.diff_result = null
-        this.loadConfigList()
-      },
-
-      loadConfigList() {
-        // 加载设备的配置备份列表
-        this.config_loading = true
-
-        let that = this
-        config_api.getConfigList({
-          ip: this.current_device.ip
-        }, {}).then(function(response) {
-          if (response.data && response.data.code === 0) {
-            that.config_list = response.data.data || []
-            if (that.config_list.length === 0) {
-              that.$message({
-                type: 'warning',
-                message: '该设备暂无配置备份记录'
-              })
-            }
-          } else {
-            that.$message({
-              type: 'error',
-              message: '获取配置列表失败'
-            })
-          }
-          that.config_loading = false
-        }).catch(function(error) {
-          console.log(error)
-          that.config_loading = false
-          that.$message({
-            type: 'error',
-            message: '获取配置列表失败'
-          })
-        })
-      },
-
-      handleDrawerClose() {
-        this.drawer_visible = false
-        this.config_list = []
-        this.diff_result = null
-      },
-
-      getBackupTypeTag(type) {
-        const typeMap = {
-          '自动': 'success',
-          '手动': 'primary',
-          '变更': 'warning'
-        }
-        return typeMap[type] || 'info'
-      },
-
-      formatTime(timestamp) {
-        if (!timestamp) {
-          return ''
-        }
-        let date = new Date(parseInt(timestamp) * 1000)
-        let pad = n => String(n).padStart(2, '0')
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-      },
-
-      getBackupType(change_id) {
-        return change_id ? '变更' : '自动'
-      },
-
-      getBackupNote(change_id) {
-        return change_id ? `变更单号: ${change_id}` : '定期自动备份'
-      },
-
-      isConfigChanged(row) {
-        return row.created_at === row.updated_at
-      },
-
-      handleCompareVersionChange() {
-        // 版本选择变化时清空之前的对比结果
-        this.diff_result = null
-        this.diff_drawer_visible = false
-      },
-
-      handleDiffDrawerClose() {
-        this.diff_drawer_visible = false
-      },
-
-      handleCompare() {
-        if (!this.can_compare) {
-          return
-        }
-
-        this.diff_loading = true
-        this.diff_drawer_visible = true
-        this.diff_result = '<p style="text-align: center; color: #999;">正在对比配置，请稍候...</p>'
-
-        let that = this
-        let full_diff = this.diff_mode === 'full'
-
-        config_api.compareConfigs({
-          src_id: this.compare_src,
-          tar_id: this.compare_target,
-          full_diff: full_diff
-        }, {}).then(function(response) {
-          if (response.data && response.data.code === 0) {
-            let result = response.data.data
-            that.diff_stats = result.stats || {
-              added: 0,
-              deleted: 0,
-              modified: 0
-            }
-            that.diff_result = result.html || '<p>无差异</p>'
-
-            that.$message({
-              type: 'success',
-              message: '配置对比完成'
-            })
-          } else {
-            that.diff_result = '<p style="color: #f56c6c;">配置对比失败</p>'
-            that.$message({
-              type: 'error',
-              message: '配置对比失败'
-            })
-          }
-          that.diff_loading = false
-        }).catch(function(error) {
-          console.log(error)
-          that.diff_result = '<p style="color: #f56c6c;">配置对比失败</p>'
-          that.diff_loading = false
-          that.$message({
-            type: 'error',
-            message: '配置对比失败'
-          })
-        })
-      },
-
-      handleViewConfigDetail(row) {
-        // 查看配置详情
-        this.config_detail_content = '正在加载配置内容...'
-        this.detail_dialog_visible = true
-
-        let that = this
-        config_api.getConfigDetail({
-          log_id: row.log_id
-        }, {}).then(function(response) {
-          if (response.data && response.data.code === 0) {
-            let detail = response.data.data
-            that.config_detail_content = detail.detail || '配置内容为空'
-          } else {
-            that.config_detail_content = '加载配置失败'
-            that.$message({
-              type: 'error',
-              message: '获取配置详情失败'
-            })
-          }
-        }).catch(function(error) {
-          console.log(error)
-          that.config_detail_content = '加载配置失败'
-          that.$message({
-            type: 'error',
-            message: '获取配置详情失败'
-          })
-        })
-      },
-
-      handleDownloadConfig(row) {
-        // 下载配置文件
-        let that = this
-        config_api.getConfigDetail({
-          log_id: row.log_id
-        }, {}).then(function(response) {
-          if (response.data && response.data.code === 0) {
-            let detail = response.data.data
-            let content = detail.detail || ''
-
-            // 创建下载
-            let blob = new Blob([content], { type: 'text/plain' })
-            let aTag = document.createElement('a')
-            let filename = `${that.current_device.sysname}_${that.formatTime(row.created_at).replace(/[\s:]/g, '_')}.txt`
-            aTag.download = filename
-            aTag.href = URL.createObjectURL(blob)
-            aTag.click()
-            URL.revokeObjectURL(aTag.href)
-
-            that.$message({
-              type: 'success',
-              message: '配置文件下载成功'
-            })
-          } else {
-            that.$message({
-              type: 'error',
-              message: '获取配置内容失败'
-            })
-          }
-        }).catch(function(error) {
-          console.log(error)
-          that.$message({
-            type: 'error',
-            message: '下载配置失败'
-          })
-        })
-      },
-
-      handleDeleteConfig(row) {
-        // 删除配置备份
-        this.$confirm(`确认删除配置记录 #${row.log_id} (${this.formatTime(row.updated_at)}) 吗？`, '删除确认', {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-          type: 'warning'
-        }).then(() => {
-          let that = this
-          config_api.deleteConfig({
-            log_id: row.log_id
-          }, {}).then(function(response) {
-            if (response.data && response.data.code === 0) {
-              that.$message({
-                type: 'success',
-                message: '删除成功'
-              })
-              // 重新加载配置列表
-              that.loadConfigList()
-              // 如果删除的是对比选中的版本，清空对比选择
-              if (that.compare_src === row.log_id) {
-                that.compare_src = null
-              }
-              if (that.compare_target === row.log_id) {
-                that.compare_target = null
-              }
-            } else {
-              that.$message({
-                type: 'error',
-                message: response.data.message || '删除失败'
-              })
-            }
-          }).catch(function(error) {
-            console.log(error)
-            that.$message({
-              type: 'error',
-              message: '删除失败'
-            })
-          })
-        }).catch(() => {
-          // 用户取消删除
-        })
-      },
-
-      handleCopyConfig() {
-        // 复制配置内容到剪贴板
-        const textarea = document.createElement('textarea')
-        textarea.value = this.config_detail_content
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textarea)
-
-        this.$message({
-          type: 'success',
-          message: '配置已复制到剪贴板'
-        })
-      },
-
-      // ==================== Excel导出相关 ====================
-      download_table:function(){
-      	this.downloadExcl(this.table_info);
-      },
-      downloadExcl:function(json, type){
-      	let tmpDown;
-      	let getjson=json;
-      	let keys = getjson[0];
-      	getjson.unshift({});
-      	let keyMap = [];
-      	for (let k in keys) {
-      		keyMap.push(k);
-      		getjson[0][k] = k;
-      	}
-      	let tmpdata = [];
-      	getjson.map((v, i) => keyMap.map((k, j) => Object.assign({}, {
-      		v: v[k],
-      		position: (j > 25 ? this.getCharCol(j) : String.fromCharCode(65 + j)) + (i + 1)
-      	}))).reduce((prev, next) => prev.concat(next)).forEach((v, i) => tmpdata[v.position] = {
-      				v: v.v
-      			});
-      	let outputPos = Object.keys(tmpdata);
-      	let tmpWB = {
-      		SheetNames: ['mySheet'],
-      		Sheets: {
-      			'mySheet': Object.assign({},
-      				tmpdata,
-      				{
-      					'!ref': outputPos[0] + ':' + outputPos[outputPos.length - 1]
-      				})
-      		}
-      	};
-
-      	tmpDown = new Blob([this.s2ab(XLSX.write(tmpWB,
-      						{bookType:(type == undefined ? 'xlsx':type),bookSST: false, type: 'binary'}
-      						))], {type: "" });
-
-        let aTag = document.createElement('a')
-        aTag.download = "device_list.xlsx"
-        aTag.href = URL.createObjectURL(tmpDown)
-        aTag.click()
-        URL.revokeObjectURL(aTag.href)
-      },
-      s2ab:function(s){
-      	let buf = new ArrayBuffer(s.length);
-      	let view = new Uint8Array(buf);
-      	for (let i = 0; i != s.length; ++i) view[i] = s.charCodeAt(i) & 0xFF;
-      	return buf;
-      },
-      getCharCol:function(n){
-      	let temCol = '',
-      	s = '',
-      	m = 0
-      	while (n > 0) {
-      		m = n % 26 + 1
-      		s = String.fromCharCode(m + 64) + s
-      		n = (n - m) / 26
-      	}
-      	return s
-      },
+    canSubmit(row) {
+      return row.status === '00' && row.username === this.currentUser
     },
+
+    canTakeover(row) {
+      if (row.status !== '01') return false
+      if (!row.cur_group) return false
+      let members = row.cur_group.split(',')
+      return members.includes(this.currentUser)
+    },
+
+    canApprove(row) {
+      return row.status === '02' && row.cur_user === this.currentUser
+    },
+
+    canDelete(row) {
+      // 管理员(system/admin)可以删除任意工单，普通用户只能删除草稿状态且是自己创建的工单
+      const isAdmin = ['system', 'admin'].includes(this.currentRid)
+      if (isAdmin) {
+        return true
+      }
+      return row.status === '00' && row.username === this.currentUser
+    },
+
+    // 操作
+    handleCreate() {
+      this.dialogTitle = '创建工单'
+      this.isEdit = false
+      this.orderForm = {
+        op_id: null,
+        op_type: '',
+        title: '',
+        descrip: '',
+        time_range: null,
+        assigner: '',
+        popo: ''
+      }
+      this.dialogVisible = true
+    },
+
+    handleView(row) {
+      this.$router.push({
+        path: '/pages/demo/test4',
+        query: { op_id: row.op_id }
+      })
+    },
+
+    handleEdit(row) {
+      this.dialogTitle = '编辑工单'
+      this.isEdit = true
+      this.orderForm = {
+        op_id: row.op_id,
+        op_type: row.op_type,
+        title: row.title,
+        descrip: row.descrip,
+        time_range: row.begin_time && row.finish_time ? [
+          parseInt(row.begin_time) * 1000,
+          parseInt(row.finish_time) * 1000
+        ] : null,
+        assigner: row.assigner || '',
+        popo: row.popo || ''
+      }
+      this.dialogVisible = true
+    },
+
+    handleSubmit(row) {
+      this.currentOrder = row
+      this.submitDialogVisible = true
+    },
+
+    handleTakeover(row) {
+      this.currentOrder = row
+      this.takeoverDialogVisible = true
+    },
+
+    handleApprove(row) {
+      this.currentOrder = row
+      this.approveForm.status = '10'
+      this.approveDialogVisible = true
+    },
+
+    handleCopy(row) {
+      this.submitting = true
+      alterationApi.copyOrder({ op_id: row.op_id }).then(response => {
+        if (response.data.code === 0) {
+          this.$message.success('复制成功')
+          this.loadOrderList()
+        } else {
+          this.$message.error(response.data.message || '复制失败')
+        }
+        this.submitting = false
+      }).catch(error => {
+        console.error('复制工单失败:', error)
+        this.$message.error('复制失败')
+        this.submitting = false
+      })
+    },
+
+    handleDelete(row) {
+      this.$confirm(`确认删除工单 #${row.op_id} 吗？`, '删除确认', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        alterationApi.deleteOrder({ op_id: row.op_id }).then(response => {
+          if (response.data.code === 0) {
+            this.$message.success('删除成功')
+            this.loadOrderList()
+          } else {
+            this.$message.error(response.data.message || '删除失败')
+          }
+        }).catch(error => {
+          console.error('删除工单失败:', error)
+          this.$message.error('删除失败')
+        })
+      }).catch(() => {})
+    },
+
+    // 保存工单
+    handleSave() {
+      this.$refs.orderForm.validate(valid => {
+        if (!valid) return
+
+        this.submitting = true
+
+        let params = {
+          op_type: this.orderForm.op_type,
+          title: this.orderForm.title,
+          descrip: this.orderForm.descrip,
+          assigner: this.orderForm.assigner,
+          popo: this.orderForm.popo
+        }
+
+        if (this.orderForm.time_range && this.orderForm.time_range.length === 2) {
+          params.begin_time = String(Math.floor(this.orderForm.time_range[0] / 1000))
+          params.finish_time = String(Math.floor(this.orderForm.time_range[1] / 1000))
+        }
+
+        if (this.isEdit) {
+          params.op_id = this.orderForm.op_id
+        }
+
+        const apiCall = this.isEdit ? alterationApi.updateOrder(params) : alterationApi.addOrder(params)
+
+        apiCall.then(response => {
+          if (response.data.code === 0) {
+            this.$message.success(this.isEdit ? '保存成功' : '创建成功')
+            this.dialogVisible = false
+            this.loadOrderList()
+          } else {
+            this.$message.error(response.data.message || '操作失败')
+          }
+          this.submitting = false
+        }).catch(error => {
+          console.error('保存工单失败:', error)
+          this.$message.error('操作失败')
+          this.submitting = false
+        })
+      })
+    },
+
+    // 确认提交
+    confirmSubmit() {
+      this.submitting = true
+      alterationApi.submitOrder({ op_id: this.currentOrder.op_id }).then(response => {
+        if (response.data.code === 0) {
+          this.$message.success('提交成功')
+          this.submitDialogVisible = false
+          this.loadOrderList()
+        } else {
+          this.$message.error(response.data.message || '提交失败')
+        }
+        this.submitting = false
+      }).catch(error => {
+        console.error('提交工单失败:', error)
+        this.$message.error('提交失败')
+        this.submitting = false
+      })
+    },
+
+    // 确认接手
+    confirmTakeover() {
+      this.submitting = true
+      alterationApi.takeoverOrder({ op_id: this.currentOrder.op_id }).then(response => {
+        if (response.data.code === 0) {
+          this.$message.success('接手成功')
+          this.takeoverDialogVisible = false
+          this.loadOrderList()
+        } else {
+          this.$message.error(response.data.message || '接手失败')
+        }
+        this.submitting = false
+      }).catch(error => {
+        console.error('接手工单失败:', error)
+        this.$message.error('接手失败')
+        this.submitting = false
+      })
+    },
+
+    // 确认审批
+    confirmApprove() {
+      this.submitting = true
+      alterationApi.approveOrder({
+        op_id: this.currentOrder.op_id,
+        status: this.approveForm.status
+      }).then(response => {
+        if (response.data.code === 0) {
+          this.$message.success('审批完成')
+          this.approveDialogVisible = false
+          this.loadOrderList()
+        } else {
+          this.$message.error(response.data.message || '审批失败')
+        }
+        this.submitting = false
+      }).catch(error => {
+        console.error('审批工单失败:', error)
+        this.$message.error('审批失败')
+        this.submitting = false
+      })
+    },
+
+    handleDialogClose() {
+      this.$refs.orderForm.resetFields()
+    }
   }
+}
 </script>
 
 <style scoped>
-.drawer-content {
-  padding: 0 20px 20px 20px;
+.alteration-manage {
+  padding: 20px;
 }
 
-.compare-card {
+.filter-card {
   margin-bottom: 20px;
 }
 
-.compare-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.diff-result-card {
-  margin-bottom: 20px;
-}
-
-.diff-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.diff-content {
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-  background-color: #f5f5f5;
-  padding: 15px;
-  border-radius: 4px;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.diff-content >>> table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.diff-content >>> td {
-  padding: 2px 5px;
-  word-break: break-all;
-}
-
-.config-list-card {
+.table-card {
   margin-bottom: 20px;
 }
 </style>
