@@ -18,62 +18,59 @@
       </span>
     </div>
 
-    <!-- 内容区域 -->
-    <div class="content-wrapper">
-      <!-- 输入区域 -->
-      <div class="input-section">
-        <div class="input-panel">
-          <div class="panel-header">
-            <span class="panel-title">文本1（原始）</span>
+    <!-- 输入区域 -->
+    <div class="input-section">
+      <div class="input-panel">
+        <div class="panel-header">
+          <span class="panel-title">文本1（原始）</span>
+          <div class="header-actions">
+            <span class="char-count">{{ input_src.length }} 字符 / {{ getLineCount(input_src) }} 行</span>
             <el-button type="text" size="mini" @click="input_src = ''">清空</el-button>
           </div>
-          <el-input
-            type="textarea"
-            class="text-input"
-            placeholder="请输入原始文本..."
-            v-model="input_src"
-            @input="onInputChange">
-          </el-input>
-          <div class="panel-footer">
-            <span class="char-count">{{ input_src.length }} 字符 / {{ getLineCount(input_src) }} 行</span>
-          </div>
         </div>
-
-        <div class="input-panel">
-          <div class="panel-header">
-            <span class="panel-title">文本2（对比）</span>
-            <el-button type="text" size="mini" @click="input_target = ''">清空</el-button>
-          </div>
-          <el-input
-            type="textarea"
-            class="text-input"
-            placeholder="请输入对比文本..."
-            v-model="input_target"
-            @input="onInputChange">
-          </el-input>
-          <div class="panel-footer">
-            <span class="char-count">{{ input_target.length }} 字符 / {{ getLineCount(input_target) }} 行</span>
-          </div>
-        </div>
+        <el-input
+          type="textarea"
+          class="text-input"
+          placeholder="请输入原始文本..."
+          v-model="input_src"
+          @input="onInputChange">
+        </el-input>
       </div>
 
-      <!-- 结果区域 -->
-      <div class="result-section">
-        <div class="result-header">
-          <span class="panel-title">
-            <i class="el-icon-document"></i> 对比结果
-          </span>
-          <div v-if="diff_result">
-            <el-tag size="mini" type="success">已完成</el-tag>
+      <div class="input-panel">
+        <div class="panel-header">
+          <span class="panel-title">文本2（对比）</span>
+          <div class="header-actions">
+            <span class="char-count">{{ input_target.length }} 字符 / {{ getLineCount(input_target) }} 行</span>
+            <el-button type="text" size="mini" @click="input_target = ''">清空</el-button>
           </div>
         </div>
-        <div class="result-content" v-loading="loading">
-          <div v-if="!diff_result && !loading" class="empty-state">
-            <i class="el-icon-document-copy"></i>
-            <p>输入文本后将显示对比结果</p>
-          </div>
-          <div v-else v-html="diff_result" class="diff-html-wrapper"></div>
+        <el-input
+          type="textarea"
+          class="text-input"
+          placeholder="请输入对比文本..."
+          v-model="input_target"
+          @input="onInputChange">
+        </el-input>
+      </div>
+    </div>
+
+    <!-- 结果区域 -->
+    <div class="result-section">
+      <div class="result-header">
+        <span class="panel-title">
+          <i class="el-icon-document"></i> 对比结果
+        </span>
+        <div v-if="diff_result">
+          <el-tag size="mini" type="success">已完成</el-tag>
         </div>
+      </div>
+      <div class="result-content" v-loading="loading">
+        <div v-if="!diff_result && !loading" class="empty-state">
+          <i class="el-icon-document-copy"></i>
+          <p>输入文本后将显示对比结果</p>
+        </div>
+        <div v-else v-html="diff_result" class="diff-html-wrapper"></div>
       </div>
     </div>
   </div>
@@ -183,7 +180,7 @@
   background: white;
   padding: 12px 20px;
   border-radius: 4px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
   display: flex;
   align-items: center;
@@ -196,18 +193,11 @@
   margin-left: 8px;
 }
 
-.content-wrapper {
-  flex: 1;
-  display: flex;
-  gap: 20px;
-  min-height: 0;
-}
-
 .input-section {
   display: flex;
-  gap: 20px;
-  flex: 0 0 45%;
-  min-width: 0;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
 }
 
 .input-panel {
@@ -221,7 +211,7 @@
 }
 
 .panel-header {
-  padding: 12px 16px;
+  padding: 10px 16px;
   border-bottom: 1px solid #ebeef5;
   display: flex;
   justify-content: space-between;
@@ -234,11 +224,10 @@
   font-size: 14px;
 }
 
-.panel-footer {
-  padding: 8px 16px;
-  border-top: 1px solid #ebeef5;
-  background: #fafafa;
-  text-align: right;
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .char-count {
@@ -253,12 +242,12 @@
 
 .text-input >>> .el-textarea__inner {
   border: none;
-  border-radius: 0;
-  padding: 16px;
+  border-radius: 0 0 4px 4px;
+  padding: 12px 16px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'source-code-pro', monospace;
   font-size: 13px;
   line-height: 1.6;
-  height: 100%;
+  height: 150px;
   resize: none;
   background: #fafafa;
 }
@@ -270,7 +259,7 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  min-height: 0;
 }
 
 .result-header {
@@ -279,6 +268,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .result-content {
