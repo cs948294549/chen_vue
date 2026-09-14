@@ -56,6 +56,10 @@ axios.interceptors.response.use(response => {
       type: "warning"
     })
   }else if(response.data.code==401){
+    // 如果是登录接口返回401，不要触发logout（用户本来就没登录），只弹提示让Login.vue自己处理
+    if(response.config.url && response.config.url.includes('/system/login')){
+      return Promise.resolve(response)
+    }
     Message({
       message: "用户登录失效, 请退出重新登录",
       type: "warning"
@@ -67,22 +71,35 @@ axios.interceptors.response.use(response => {
   }
 } , error => {
   if (!error.response) {
-  } else if (error.response.code === 404) {
-  } else if (error.response.code === 401) {
+    // 网络错误或请求被取消
+    Message({
+      message: "网络连接失败，请检查网络",
+      type: "error"
+    })
+  } else if (error.response.status === 401) {
     Message({
       message: "用户登录失效, 请退出重新登录",
       type: "warning"
     })
     store.dispatch("user/logout")
     router.push("/login")
-  } else if (error.response.code === 403) {
+  } else if (error.response.status === 403) {
     Message({
       message: "用户没有访问页面权限",
       type: "warning"
     })
-  } else {
+  } else if (error.response.status === 404) {
+    Message({
+      message: "请求的资源不存在",
+      type: "warning"
+    })
+  } else if (error.response.status >= 500) {
+    Message({
+      message: "服务器内部错误，请稍后重试",
+      type: "error"
+    })
   }
-  return Promise.reject(error.response) // 返回接口返回的错误信息
+  return Promise.reject(error.response)
 })
 )
 

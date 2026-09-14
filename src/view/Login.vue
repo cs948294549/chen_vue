@@ -33,6 +33,11 @@
           ></el-input>
         </el-form-item>
 
+        <!-- LDAP认证选项 -->
+        <el-form-item>
+          <el-checkbox v-model="loginForm.useLdap">使用 LDAP 认证</el-checkbox>
+        </el-form-item>
+
         <!-- 登录按钮 -->
         <el-form-item>
           <el-button
@@ -63,7 +68,8 @@ export default {
       loginForm: {
         username: '', // 账号
         password: '', // 密码
-        remember: false // 记住密码
+        remember: false, // 记住密码
+        useLdap: true // 是否使用LDAP认证，默认勾选
       },
       // 表单验证规则
       loginRules: {
@@ -141,17 +147,23 @@ export default {
         this.isLoading = true;
         let username = this.loginForm.username
         let passwd = this.loginForm.password
-        let identify = lmd5.salt_identify(passwd)
         let timestamp = parseInt(new Date().getTime()/1000)
 
-        let secret = lmd5.hex_md5(username+identify+"netops"+timestamp)
+        let secret
+        if (this.loginForm.useLdap) {
+          // LDAP认证：将明文密码AES加密后传给后端，由后端解密后向LDAP发起bind校验
+          secret = NativeAesGcmUtil.passwd_encode(passwd)
+        } else {
+          let identify = lmd5.salt_identify(passwd)
+          secret = lmd5.hex_md5(username+identify+"netops"+timestamp)
+        }
         let post_data = {
           "username": username,
           "secret": secret,
-          "timestamp": timestamp
+          "timestamp": timestamp,
+          "auth_type": this.loginForm.useLdap ? "ldap" : "local"
         }
         // console.log("登陆信息==", post_data)
-
         login_api.login(post_data,{}).then(async function(response){
           // console.log("登陆结果",response.data)
           if(response.data.code===0){
@@ -161,8 +173,6 @@ export default {
               "token_sign": secret
             }
             // console.log("写入信息==",user_infos)
-
-
             await that.$store.dispatch("user/login", user_infos)
             // console.log("写入完成，获取路由")
             await that.getRouteList()
