@@ -490,7 +490,8 @@ export default {
       // 只有创建人或指定执行人可以开始变更
       const isCreator = this.orderDetail.username === this.currentUser
       const isAssigner = this.orderDetail.assigner === this.currentUser
-      return isCreator || isAssigner
+      const isAll = this.orderDetail.assigner === 'all'
+      return isCreator || isAssigner || isAll
     },
 
     // 是否可以变更结束
@@ -499,7 +500,8 @@ export default {
       // 只有创建人或指定变更人可以结束变更
       const isCreator = this.orderDetail.username === this.currentUser
       const isAssigner = this.orderDetail.assigner === this.currentUser
-      return isCreator || isAssigner
+      const isAll = this.orderDetail.assigner === 'all'
+      return isCreator || isAssigner || isAll
     },
 
     // 是否可以取消
@@ -519,7 +521,8 @@ export default {
       // 只有创建人或指定变更人可以执行
       const isCreator = this.orderDetail.username === this.currentUser
       const isAssigner = this.orderDetail.assigner === this.currentUser
-      return isCreator || isAssigner
+      const isAll = this.orderDetail.assigner === 'all'
+      return isCreator || isAssigner || isAll
     },
 
     // 是否可以执行单个设备
@@ -528,7 +531,8 @@ export default {
       // 只有创建人或指定变更人可以执行
       const isCreator = this.orderDetail.username === this.currentUser
       const isAssigner = this.orderDetail.assigner === this.currentUser
-      return isCreator || isAssigner
+      const isAll = this.orderDetail.assigner === 'all'
+      return isCreator || isAssigner || isAll
     },
 
     // 是否有任何操作权限
@@ -572,7 +576,8 @@ export default {
       // 只有创建人或指定变更人可以回滚
       const isCreator = this.orderDetail.username === this.currentUser
       const isAssigner = this.orderDetail.assigner === this.currentUser
-      return isCreator || isAssigner
+      const isAll = this.orderDetail.assigner === 'all'
+      return isCreator || isAssigner || isAll
     },
 
     // 加载工单类型列表
