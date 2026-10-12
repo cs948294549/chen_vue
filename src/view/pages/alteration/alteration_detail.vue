@@ -1306,6 +1306,9 @@ export default {
 .info-content {
   padding: 20px;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .info-row {
@@ -1360,6 +1363,8 @@ export default {
   color: #606266;
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
+  padding-right: 8px;
 }
 
 .action-buttons {
