@@ -1,12 +1,12 @@
 <template>
-  <div class="prefix-list-records-page">
+  <div class="port-group-records-page">
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <el-form :inline="true" :model="filterForm" size="small">
-        <el-form-item label="前缀名称">
+        <el-form-item label="端口簿名称">
           <el-input
-            v-model="filterForm.pl_name"
-            placeholder="输入前缀列表名称"
+            v-model="filterForm.group_name"
+            placeholder="输入端口簿名称"
             clearable
             style="width: 180px;">
           </el-input>
@@ -21,18 +21,13 @@
           </el-input>
         </el-form-item>
 
-        <el-form-item label="厂商类型">
-          <el-select
-            v-model="filterForm.vendor_type"
-            placeholder="请选择"
+        <el-form-item label="配置指纹">
+          <el-input
+            v-model="filterForm.fingerprint"
+            placeholder="输入完整指纹"
             clearable
-            style="width: 150px;">
-            <el-option label="Cisco NX-OS" value="cisco_nx"></el-option>
-            <el-option label="Cisco IOS" value="cisco_ios"></el-option>
-            <el-option label="Cisco IOS-XR" value="cisco_xr"></el-option>
-            <el-option label="H3C" value="h3c"></el-option>
-            <el-option label="Huawei" value="huawei"></el-option>
-          </el-select>
+            style="width: 200px;">
+          </el-input>
         </el-form-item>
 
         <el-form-item label="分组方式">
@@ -54,21 +49,22 @@
     <div v-if="groupMode === 'fingerprint'" class="fingerprint-group-view">
       <el-collapse v-model="activeFingerprints" accordion>
         <el-collapse-item
-          v-for="(group, index) in fingerprintGroups"
+          v-for="group in fingerprintGroups"
           :key="group.fingerprint"
           :name="group.fingerprint">
 
           <template slot="title">
             <div class="collapse-title">
               <div class="title-left">
-                <el-tag type="primary" size="medium">{{ group.pl_name }}</el-tag>
+                <el-tag type="primary" size="medium">{{ group.group_name }}</el-tag>
+                <el-tag type="primary" size="mini" effect="plain">{{ group.acl_type }}</el-tag>
                 <span class="fingerprint-short">
-                  指纹: {{ group.fingerprint.substring(0, 16) }}...
+                  指纹: {{ (group.fingerprint || '').substring(0, 16) }}...
                 </span>
-                <el-tag type="success" size="small">{{ group.device_count }} 台设备</el-tag>
-                <el-tag type="info" size="small">{{ group.entry_count }} 条配置</el-tag>
               </div>
               <div class="title-right">
+                <el-tag type="success" size="mini" effect="plain">{{ group.device_count }} 台设备</el-tag>
+                <el-tag type="info" size="mini" effect="plain">{{ group.entry_count }} 条条目</el-tag>
                 <el-button
                   size="mini"
                   type="text"
@@ -80,46 +76,27 @@
             </div>
           </template>
 
-          <!-- 设备列表 -->
-          <el-table
-            :data="group.hosts"
-            border
-            size="small"
-            style="width: 100%;">
-
+          <el-table :data="group.hosts" border size="small" style="width: 100%;">
             <el-table-column type="index" label="#" width="50" align="center" />
-
             <el-table-column prop="device_ip" label="设备IP" width="150">
               <template slot-scope="scope">
                 <span class="device-ip">{{ scope.row.device_ip }}</span>
               </template>
             </el-table-column>
-
             <el-table-column prop="device_name" label="设备名称" min-width="200" />
-
-            <el-table-column prop="vendor_type" label="厂商类型" width="120">
+            <el-table-column prop="vendor" label="厂商" width="120">
               <template slot-scope="scope">
-                <el-tag :type="getVendorTagType(scope.row.vendor_type)" size="mini">
-                  {{ scope.row.vendor_type }}
-                </el-tag>
+                <el-tag :type="getVendorTagType(scope.row.vendor)" size="mini">{{ scope.row.vendor }}</el-tag>
               </template>
             </el-table-column>
-
             <el-table-column prop="collected_at" label="采集时间" width="160">
               <template slot-scope="scope">
                 {{ formatTime(scope.row.collected_at) }}
               </template>
             </el-table-column>
-
-            <el-table-column label="操作" width="150" align="center">
+            <el-table-column label="操作" width="120" align="center">
               <template slot-scope="scope">
-                <el-button
-                  size="mini"
-                  type="text"
-                  icon="el-icon-view"
-                  @click="handleViewDeviceConfig(scope.row, group)">
-                  查看详情
-                </el-button>
+                <el-button size="mini" type="text" icon="el-icon-view" @click="handleViewDeviceConfig(scope.row, group)">查看详情</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -131,12 +108,7 @@
 
     <!-- 按设备展示视图 -->
     <div v-if="groupMode === 'device'" class="device-list-view">
-      <el-table
-        :data="filteredDeviceRecords"
-        border
-        stripe
-        style="width: 100%">
-
+      <el-table :data="filteredDeviceRecords" border stripe style="width: 100%">
         <el-table-column prop="device_ip" label="设备IP" width="150" fixed>
           <template slot-scope="scope">
             <span class="device-ip">{{ scope.row.device_ip }}</span>
@@ -145,31 +117,33 @@
 
         <el-table-column prop="device_name" label="设备名称" width="200" show-overflow-tooltip />
 
-        <el-table-column prop="pl_name" label="前缀列表名称" width="150">
+        <el-table-column prop="group_name" label="端口簿名称" width="180">
           <template slot-scope="scope">
-            <el-tag size="small">{{ scope.row.pl_name }}</el-tag>
+            <el-tag size="small">{{ scope.row.group_name }}</el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="acl_type" label="地址族" width="90" align="center">
+          <template slot-scope="scope">
+            <el-tag type="primary" size="mini">{{ scope.row.acl_type }}</el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="vendor" label="厂商" width="120">
+          <template slot-scope="scope">
+            <el-tag :type="getVendorTagType(scope.row.vendor)" size="small">{{ scope.row.vendor }}</el-tag>
           </template>
         </el-table-column>
 
         <el-table-column prop="fingerprint" label="配置指纹" width="180" show-overflow-tooltip>
           <template slot-scope="scope">
-            <span class="fingerprint-text">{{ scope.row.fingerprint.substring(0, 16) }}...</span>
+            <span class="fingerprint-text">{{ (scope.row.fingerprint || '').substring(0, 16) }}...</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="vendor_type" label="厂商类型" width="120">
+        <el-table-column label="条目数量" width="100" align="center">
           <template slot-scope="scope">
-            <el-tag :type="getVendorTagType(scope.row.vendor_type)" size="small">
-              {{ scope.row.vendor_type }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column prop="entry_count" label="条目数量" width="100" align="center">
-          <template slot-scope="scope">
-            <el-tag type="info" size="small">
-              {{ scope.row.entries.entries.length }} 条
-            </el-tag>
+            <el-tag type="info" size="small">{{ entryList(scope.row).length }} 条</el-tag>
           </template>
         </el-table-column>
 
@@ -181,18 +155,11 @@
 
         <el-table-column label="操作" width="150" fixed="right" align="center">
           <template slot-scope="scope">
-            <el-button
-              size="mini"
-              type="text"
-              icon="el-icon-view"
-              @click="handleViewDeviceConfigFromList(scope.row)">
-              查看详情
-            </el-button>
+            <el-button size="mini" type="text" icon="el-icon-view" @click="handleViewDeviceConfigFromList(scope.row)">查看详情</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
       <el-pagination
         v-if="deviceRecords.length > 0"
         @size-change="handleSizeChange"
@@ -201,42 +168,36 @@
         :page-sizes="[10, 20, 50, 100]"
         :page-size="pageSize"
         layout="total, sizes, prev, pager, next, jumper"
-        :total="deviceRecords.length"
+        :total="filteredDeviceTotal"
         style="margin-top: 20px; text-align: right;">
       </el-pagination>
     </div>
 
     <!-- 配置详情对话框 -->
-    <el-dialog
-      title="配置详情"
-      :visible.sync="configDialogVisible"
-      width="900px">
-
+    <el-dialog title="配置详情" :visible.sync="configDialogVisible" width="900px">
       <div v-if="currentConfig" class="config-detail">
         <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="前缀列表名称">
+          <el-descriptions-item label="端口簿名称">
             <el-tag>{{ currentConfig.name }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="条目数量">
-            <el-tag type="info">{{ currentConfig.entries.length }} 条</el-tag>
+            <el-tag type="info">{{ entryList(currentConfig).length }} 条</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="地址族">
+            <el-tag type="primary" size="mini">{{ currentConfig.acl_type }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="currentConfig.device_count" label="关联设备数量">
+            <el-tag type="success">{{ currentConfig.device_count }} 台</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="配置指纹" :span="2">
             <div style="display: flex; align-items: center;">
               <span class="fingerprint-text" style="flex: 1; font-size: 12px;">
                 {{ currentConfig.fingerprint }}
               </span>
-              <el-button
-                size="mini"
-                icon="el-icon-document-copy"
-                @click="copyFingerprint(currentConfig.fingerprint)">
-                复制
-              </el-button>
+              <el-button size="mini" icon="el-icon-document-copy" @click="copyFingerprint(currentConfig.fingerprint)">复制</el-button>
             </div>
           </el-descriptions-item>
-          <el-descriptions-item v-if="currentConfig.device_count" label="关联设备数量">
-            <el-tag type="success">{{ currentConfig.device_count }} 台</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item v-if="currentConfig.device_ip" label="设备信息">
+          <el-descriptions-item v-if="currentConfig.device_ip" label="设备信息" :span="2">
             <div>
               <div>IP: <span class="device-ip">{{ currentConfig.device_ip }}</span></div>
               <div>名称: {{ currentConfig.device_name }}</div>
@@ -250,48 +211,25 @@
           </el-descriptions-item>
         </el-descriptions>
 
-        <el-divider content-position="left">配置条目</el-divider>
+        <el-divider content-position="left">端口条目</el-divider>
 
-        <el-table
-          :data="currentConfig.entries"
-          border
-          size="small"
-          max-height="400">
-
-          <el-table-column prop="seq" label="序号" width="80" align="center" />
-
-          <el-table-column prop="action" label="动作" width="100" align="center">
+        <el-table :data="entryList(currentConfig)" border size="small" max-height="400">
+          <el-table-column type="index" label="序号" width="70" align="center" />
+          <el-table-column label="运算符" width="110" align="center">
             <template slot-scope="scope">
-              <el-tag :type="scope.row.action === 'permit' ? 'success' : 'danger'" size="mini">
-                {{ scope.row.action }}
-              </el-tag>
+              <el-tag size="mini" effect="plain">{{ scope.row.op || '-' }}</el-tag>
             </template>
           </el-table-column>
-
-          <el-table-column prop="prefix" label="前缀" min-width="180" />
-
-          <el-table-column prop="ge" label="GE" width="80" align="center">
+          <el-table-column label="端口 / 引用" min-width="240">
             <template slot-scope="scope">
-              {{ scope.row.ge || '-' }}
-            </template>
-          </el-table-column>
-
-          <el-table-column prop="le" label="LE" width="80" align="center">
-            <template slot-scope="scope">
-              {{ scope.row.le || '-' }}
+              <code class="mono">{{ entryText(scope.row) }}</code>
             </template>
           </el-table-column>
         </el-table>
 
-        <!-- 如果是分组视图，显示关联的设备列表 -->
         <template v-if="currentConfig.hosts && currentConfig.hosts.length > 0">
           <el-divider content-position="left">关联设备</el-divider>
-          <el-table
-            :data="currentConfig.hosts"
-            border
-            size="small"
-            max-height="300">
-
+          <el-table :data="currentConfig.hosts" border size="small" max-height="300">
             <el-table-column type="index" label="#" width="50" align="center" />
             <el-table-column prop="device_ip" label="设备IP" width="150" />
             <el-table-column prop="device_name" label="设备名称" min-width="200" />
@@ -313,62 +251,52 @@
 </template>
 
 <script>
-import prefixListApi from '@/api/mapis/prefix_list_interface'
+import aclApi from '@/api/mapis/acl_interface'
 
 export default {
-  name: 'PrefixListRecords',
+  name: 'PortGroupRecords',
 
   data() {
     return {
-      // 筛选条件
       filterForm: {
-        pl_name: '',
+        group_name: '',
         device: '',
-        vendor_type: ''
+        fingerprint: ''
       },
 
-      // 分组模式
-      groupMode: 'fingerprint', // 'fingerprint' | 'device'
+      groupMode: 'fingerprint',
 
-      // 按指纹分组数据
       fingerprintGroups: [],
       activeFingerprints: [],
 
-      // 按设备展示数据
       deviceRecords: [],
       currentPage: 1,
       pageSize: 20,
 
-      // 配置详情对话框
       configDialogVisible: false,
       currentConfig: null
     }
   },
 
   computed: {
+    // 记录表只支持 group_name / device_ip / fingerprint 精确过滤，设备关键字在这里做本地模糊匹配
     filteredDeviceRecords() {
-      let data = this.deviceRecords
-
-      if (this.filterForm.pl_name) {
-        data = data.filter(item =>
-          item.pl_name.toLowerCase().includes(this.filterForm.pl_name.toLowerCase())
-        )
-      }
-
-      if (this.filterForm.device) {
-        data = data.filter(item =>
-          item.device_ip.includes(this.filterForm.device) ||
-          item.device_name.toLowerCase().includes(this.filterForm.device.toLowerCase())
-        )
-      }
-
-      if (this.filterForm.vendor_type) {
-        data = data.filter(item => item.vendor_type === this.filterForm.vendor_type)
-      }
-
+      const data = this.deviceMatchedRecords
       const start = (this.currentPage - 1) * this.pageSize
-      const end = start + this.pageSize
-      return data.slice(start, end)
+      return data.slice(start, start + this.pageSize)
+    },
+
+    filteredDeviceTotal() {
+      return this.deviceMatchedRecords.length
+    },
+
+    deviceMatchedRecords() {
+      if (!this.filterForm.device) return this.deviceRecords
+      const keyword = this.filterForm.device.toLowerCase()
+      return this.deviceRecords.filter(item =>
+        (item.device_ip || '').includes(this.filterForm.device) ||
+        (item.device_name || '').toLowerCase().includes(keyword)
+      )
     }
   },
 
@@ -379,52 +307,93 @@ export default {
   methods: {
     // ==================== 工具方法 ====================
 
+    // 记录表里 entries 是裸数组，兼容包了一层的情况
+    entryList(row) {
+      if (!row || !row.entries) return []
+      return Array.isArray(row.entries) ? row.entries : (row.entries.entries || [])
+    },
+
+    // 端口值可能是 int（数字端口）或 string（服务名别名）
+    portsText(ports) {
+      if (!Array.isArray(ports) || ports.length === 0) return '-'
+      return ports.map(p => (p === null || p === undefined ? '' : String(p))).join(', ')
+    },
+
+    // 记录表条目是采集解析出的原始形态 {seq, op, ports, description}，没有 type/ref
+    entryText(entry) {
+      if (!entry) return '-'
+      return this.portsText(entry.ports)
+    },
+
+    // 记录表不存 acl_type，端口簿固定作用于 IP 规则，指纹里带了但它不在列上
+    inferAclType(entries) {
+      return 'ipv4'
+    },
+
+    getVendorTagType(vendor) {
+      const typeMap = {
+        'cisco_nx': 'primary',
+        'cisco_ios': 'success',
+        'cisco_xr': 'warning',
+        'h3c': 'info',
+        'huawei': 'danger'
+      }
+      return typeMap[vendor] || ''
+    },
+
     formatTime(timestamp) {
       if (!timestamp) return '-'
-      // 10位时间戳转换为毫秒
       const time = timestamp.toString().length === 10 ? timestamp * 1000 : timestamp
-      const date = new Date(time)
+      const date = new Date(Number(time))
+      const pad = n => String(n).padStart(2, '0')
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+    },
 
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      const seconds = String(date.getSeconds()).padStart(2, '0')
+    copyFingerprint(fingerprint) {
+      const input = document.createElement('input')
+      input.value = fingerprint || ''
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      document.body.removeChild(input)
+      this.$message.success('指纹已复制到剪贴板')
+    },
 
-      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+    isIpLike(value) {
+      return !!value && /^[\d.:a-fA-F]+$/.test(value)
     },
 
     // ==================== 数据加载 ====================
 
     loadData() {
       const params = {
-        pl_name: this.filterForm.pl_name || undefined,
-        device: this.filterForm.device || undefined,
-        vendor: this.filterForm.vendor_type || undefined
+        group_name: this.filterForm.group_name || undefined,
+        device_ip: this.isIpLike(this.filterForm.device) ? this.filterForm.device : undefined,
+        fingerprint: this.filterForm.fingerprint || undefined
       }
 
-      prefixListApi.getRecordsList(params).then(response => {
+      aclApi.getPortGroupRecordsList(params).then(response => {
         const res = response.data
         if (res.code === 0) {
           const records = res.data || []
 
           if (this.groupMode === 'fingerprint') {
-            // 按指纹分组
             const fingerprintMap = {}
             records.forEach(record => {
-              if (!fingerprintMap[record.fingerprint]) {
-                fingerprintMap[record.fingerprint] = {
-                  pl_name: record.pl_name,
-                  fingerprint: record.fingerprint,
-                  entries: record.entries,
+              const fp = record.fingerprint || `unknown-${record.device_ip}-${record.group_name}`
+              if (!fingerprintMap[fp]) {
+                fingerprintMap[fp] = {
+                  group_name: record.group_name,
+                  fingerprint: fp,
+                  acl_type: this.inferAclType(record.entries),
+                  entries: this.entryList(record),
                   hosts: []
                 }
               }
-              fingerprintMap[record.fingerprint].hosts.push({
+              fingerprintMap[fp].hosts.push({
                 device_ip: record.device_ip,
                 device_name: record.device_name,
-                vendor_type: record.vendor,
+                vendor: record.vendor,
                 collected_at: record.collected_at
               })
             })
@@ -435,14 +404,14 @@ export default {
               entry_count: group.entries.length
             }))
           } else {
-            // 按设备展示
             this.deviceRecords = records.map(record => ({
               device_ip: record.device_ip,
               device_name: record.device_name,
-              vendor_type: record.vendor,
-              pl_name: record.pl_name,
+              vendor: record.vendor,
+              group_name: record.group_name,
               fingerprint: record.fingerprint,
-              entries: record.entries,
+              acl_type: this.inferAclType(record.entries),
+              entries: this.entryList(record),
               collected_at: record.collected_at
             }))
           }
@@ -463,11 +432,7 @@ export default {
     },
 
     handleReset() {
-      this.filterForm = {
-        pl_name: '',
-        device: '',
-        vendor_type: ''
-      }
+      this.filterForm = { group_name: '', device: '', fingerprint: '' }
       this.currentPage = 1
       this.loadData()
     },
@@ -483,7 +448,8 @@ export default {
 
     handleViewConfig(group) {
       this.currentConfig = {
-        name: group.pl_name,
+        name: group.group_name,
+        acl_type: group.acl_type,
         fingerprint: group.fingerprint,
         device_count: group.device_count,
         entries: group.entries,
@@ -494,11 +460,12 @@ export default {
 
     handleViewDeviceConfig(host, group) {
       this.currentConfig = {
-        name: group.pl_name,
+        name: group.group_name,
+        acl_type: group.acl_type,
         fingerprint: group.fingerprint,
         device_ip: host.device_ip,
         device_name: host.device_name,
-        device_vendor: host.vendor_type,
+        device_vendor: host.vendor,
         entries: group.entries,
         collected_at: host.collected_at
       }
@@ -507,38 +474,16 @@ export default {
 
     handleViewDeviceConfigFromList(row) {
       this.currentConfig = {
-        name: row.pl_name,
+        name: row.group_name,
+        acl_type: row.acl_type,
         fingerprint: row.fingerprint,
         device_ip: row.device_ip,
         device_name: row.device_name,
-        device_vendor: row.vendor_type,
+        device_vendor: row.vendor,
         entries: row.entries,
         collected_at: row.collected_at
       }
       this.configDialogVisible = true
-    },
-
-    // ==================== 工具方法 ====================
-
-    getVendorTagType(vendor) {
-      const typeMap = {
-        'cisco_nx': 'primary',
-        'cisco_ios': 'success',
-        'cisco_xr': 'warning',
-        'h3c': 'info',
-        'huawei': 'danger'
-      }
-      return typeMap[vendor] || ''
-    },
-
-    copyFingerprint(fingerprint) {
-      const input = document.createElement('input')
-      input.value = fingerprint
-      document.body.appendChild(input)
-      input.select()
-      document.execCommand('copy')
-      document.body.removeChild(input)
-      this.$message.success('指纹已复制到剪贴板')
     },
 
     handleSizeChange(val) {
@@ -563,15 +508,17 @@ export default {
         cancelButtonText: '取消',
         inputPlaceholder: '请描述该规则的用途和应用场景'
       }).then(({ value }) => {
-        const params = {
+        // 标准规则条目与设备记录条目同构 {seq, op, ports, description}，原样提交即可
+        const rawEntries = this.entryList(this.currentConfig)
+        const entries = rawEntries
+
+        aclApi.createPortGroup({
           name: this.currentConfig.name,
-          fingerprint: this.currentConfig.fingerprint,
-          entries: this.currentConfig.entries,
+          acl_type: this.currentConfig.acl_type || 'ipv4',
+          entries: entries,
           description: value || '',
           is_active: 1
-        }
-
-        prefixListApi.createStandard(params).then(response => {
+        }).then(response => {
           const res = response.data
           if (res.code === 0) {
             this.$message.success('标准规则创建成功')
@@ -583,16 +530,14 @@ export default {
           console.error('创建标准规则失败:', error)
           this.$message.error('创建失败，请重试')
         })
-      }).catch(() => {
-        // 用户取消输入
-      })
+      }).catch(() => {})
     }
   }
 }
 </script>
 
 <style scoped>
-.prefix-list-records-page {
+.port-group-records-page {
   padding: 20px;
   background: #fff;
   min-height: calc(100vh - 100px);
@@ -619,6 +564,12 @@ export default {
   gap: 10px;
 }
 
+.title-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .fingerprint-short {
   font-family: 'Courier New', monospace;
   font-size: 12px;
@@ -635,6 +586,11 @@ export default {
   font-family: 'Courier New', monospace;
   font-size: 12px;
   color: #606266;
+}
+
+.mono {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
 }
 
 .config-detail {

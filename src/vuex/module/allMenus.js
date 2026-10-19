@@ -12,8 +12,8 @@ const state = {
     }
   ],
   padding_route: {
-    name: "uuuuu",
-    item: {"id":"x-101","name":"历史告警","group":"","order":"99","path":"pages/alarms/history_alarm","hide":false,"children":[]}
+    name: "理",
+    item: {"id":"x-101","name":"issue管理","group":"策略管理","order":"99","path":"pages/policy_manage/policy_issue","hide":false,"children":[]}
   },
 
   //view为基础目录
@@ -34,7 +34,6 @@ const actions = {
   fetchRoute (context, routes) {
     // console.log("获取路由信息=开始解析==", routes)
     let padding_route = context.state.padding_route
-    // console.log("===", padding_route)
     const route_list = []
     for(let i=0;i<routes.length;i++){
       let _r = {

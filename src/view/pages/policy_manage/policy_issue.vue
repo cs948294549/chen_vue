@@ -1,14 +1,31 @@
 <template>
-  <div class="prefix-list-issues-page">
+  <div class="policy-issues-page">
     <!-- 筛选栏 -->
     <div class="filter-bar">
       <el-form :inline="true" :model="filterForm" size="small">
+        <el-form-item label="对象类型">
+          <el-select
+            v-model="filterForm.object_type"
+            placeholder="全部"
+            clearable
+            style="width: 130px;"
+            @change="handleObjectTypeFilterChange">
+            <el-option
+              v-for="item in objectTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value">
+            </el-option>
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="标准规则">
           <el-select
             v-model="filterForm.standard_id"
             placeholder="请选择"
+            filterable
             clearable
-            style="width: 200px;">
+            style="width: 220px;">
             <el-option
               v-for="item in standardOptions"
               :key="item.id"
@@ -27,14 +44,24 @@
           </el-input>
         </el-form-item>
 
+        <el-form-item label="状态">
+          <el-select v-model="filterForm.status" placeholder="全部" clearable style="width: 120px;">
+            <el-option label="待处理" value="pending"></el-option>
+            <el-option label="处理中" value="processing"></el-option>
+            <el-option label="已完成" value="completed"></el-option>
+            <el-option label="已忽略" value="ignored"></el-option>
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="创建时间">
           <el-date-picker
             v-model="filterForm.dateRange"
             type="daterange"
+            value-format="yyyy-MM-dd"
             range-separator="至"
             start-placeholder="开始日期"
             end-placeholder="结束日期"
-            style="width: 240px;">
+            style="width: 260px;">
           </el-date-picker>
         </el-form-item>
 
@@ -46,7 +73,7 @@
     </div>
 
     <!-- 处理记录列表 -->
-    <el-card shadow="never" style="margin-top: 20px;">
+    <el-card shadow="never" class="table-card">
       <div slot="header" class="clearfix">
         <span style="font-weight: bold;">处理记录列表</span>
         <div style="float: right;">
@@ -69,7 +96,7 @@
       </div>
 
       <el-table
-        :data="tableData"
+        :data="pagedTableData"
         border
         stripe
         @selection-change="handleSelectionChange"
@@ -83,9 +110,17 @@
 
         <el-table-column prop="id" label="记录ID" width="80" align="center" />
 
-        <el-table-column prop="standard_name" label="标准规则" width="150">
+        <el-table-column prop="object_type" label="对象类型" width="100" align="center">
           <template slot-scope="scope">
-            <el-tag type="primary" size="small">{{ scope.row.standard_name }}</el-tag>
+            <el-tag :type="getObjectTypeTag(scope.row.object_type)" size="small">
+              {{ scope.row.object_type_label || scope.row.object_type }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="standard_name" label="标准规则" width="160" show-overflow-tooltip>
+          <template slot-scope="scope">
+            <el-tag size="small">{{ scope.row.standard_name }}</el-tag>
           </template>
         </el-table-column>
 
@@ -95,15 +130,15 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="device_name" label="设备名称" width="200" show-overflow-tooltip />
+        <el-table-column prop="device_name" label="设备名称" width="180" show-overflow-tooltip />
 
-        <el-table-column prop="device_vendor" label="设备厂商" width="120" align="center">
+        <el-table-column prop="device_vendor" label="设备厂商" width="110" align="center">
           <template slot-scope="scope">
             <el-tag size="small" effect="plain">{{ scope.row.device_vendor }}</el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column prop="issue_type" label="问题类型" width="100" align="center">
+        <el-table-column prop="issue_type" label="问题类型" width="110" align="center">
           <template slot-scope="scope">
             <el-tag :type="scope.row.issue_type === 'drifted' ? 'warning' : 'danger'" size="small">
               {{ scope.row.issue_type === 'drifted' ? '配置漂移' : '缺失配置' }}
@@ -121,13 +156,7 @@
 
         <el-table-column prop="change_ticket_id" label="工单ID" width="140">
           <template slot-scope="scope">
-            <el-link
-              v-if="scope.row.change_ticket_id"
-              type="primary"
-              :underline="false"
-              @click="handleViewTicket(scope.row.change_ticket_id)">
-              {{ scope.row.change_ticket_id }}
-            </el-link>
+            <span v-if="scope.row.change_ticket_id">{{ scope.row.change_ticket_id }}</span>
             <span v-else>-</span>
           </template>
         </el-table-column>
@@ -144,7 +173,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="remark" label="备注" width="200" show-overflow-tooltip>
+        <el-table-column prop="remark" label="备注" width="180" show-overflow-tooltip>
           <template slot-scope="scope">
             {{ scope.row.remark || '-' }}
           </template>
@@ -168,6 +197,9 @@
                 标记 <i class="el-icon-arrow-down el-icon--right"></i>
               </el-button>
               <el-dropdown-menu slot="dropdown">
+                <el-dropdown-item :command="{row: scope.row, status: 'processing'}">
+                  <i class="el-icon-loading" style="color: #409EFF;"></i> 处理中
+                </el-dropdown-item>
                 <el-dropdown-item :command="{row: scope.row, status: 'completed'}">
                   <i class="el-icon-circle-check" style="color: #67c23a;"></i> 已完成
                 </el-dropdown-item>
@@ -180,17 +212,17 @@
               type="text"
               size="small"
               icon="el-icon-delete"
-              @click="handleDelete(scope.row)"
-              style="color: #f56c6c;">
+              style="color: #f56c6c;"
+              @click="handleDelete(scope.row)">
               删除
             </el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
+      <!-- 分页（后端返回全量，前端分页） -->
       <el-pagination
-        v-if="totalCount > 0"
+        v-if="totalCount > pageSize"
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
         :current-page="currentPage"
@@ -210,11 +242,15 @@
       append-to-body>
 
       <div v-if="currentDetail" class="detail-container">
-        <!-- 基本信息 -->
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="记录ID">{{ currentDetail.id }}</el-descriptions-item>
+          <el-descriptions-item label="对象类型">
+            <el-tag :type="getObjectTypeTag(currentDetail.object_type)" size="small">
+              {{ currentDetail.object_type_label || currentDetail.object_type }}
+            </el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="标准规则">
-            <el-tag type="primary">{{ currentDetail.standard_name }}</el-tag>
+            <el-tag>{{ currentDetail.standard_name }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="设备IP">
             <span class="device-ip">{{ currentDetail.device_ip }}</span>
@@ -233,41 +269,67 @@
               {{ getStatusText(currentDetail.status) }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="工单ID">
-            <el-link
-              v-if="currentDetail.change_ticket_id"
-              type="primary"
-              :underline="false"
-              @click="handleViewTicket(currentDetail.change_ticket_id)">
-              {{ currentDetail.change_ticket_id }}
-            </el-link>
-            <span v-else>-</span>
-          </el-descriptions-item>
+          <el-descriptions-item label="工单ID">{{ currentDetail.change_ticket_id || '-' }}</el-descriptions-item>
           <el-descriptions-item label="创建人">{{ currentDetail.created_by }}</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ formatTime(currentDetail.created_at) }}</el-descriptions-item>
           <el-descriptions-item label="处理时间">{{ formatTime(currentDetail.processed_at) }}</el-descriptions-item>
-          <el-descriptions-item label="备注" :span="2">
-            {{ currentDetail.remark || '-' }}
-          </el-descriptions-item>
+          <el-descriptions-item label="备注" :span="2">{{ currentDetail.remark || '-' }}</el-descriptions-item>
         </el-descriptions>
 
-        <!-- 配置对比 -->
-        <el-divider content-position="left">配置对比</el-divider>
+        <el-tabs v-model="detailTab" style="margin-top: 15px;">
+          <el-tab-pane label="差异对比" name="diff">
+            <div style="margin-bottom: 10px;">
+              <el-radio-group v-model="diffMode" size="small" @change="loadDetailDiffComparison">
+                <el-radio-button label="context">上下文对比</el-radio-button>
+                <el-radio-button label="full">完整对比</el-radio-button>
+              </el-radio-group>
+            </div>
+            <div v-loading="diffLoading" class="diff-html-container" v-html="diffHtml"></div>
+          </el-tab-pane>
 
-        <!-- 对比模式切换 -->
-        <div style="margin-bottom: 10px;">
-          <el-radio-group v-model="diffMode" size="small" @change="loadDetailDiffComparison">
-            <el-radio-button label="context">上下文对比</el-radio-button>
-            <el-radio-button label="full">完整对比</el-radio-button>
-          </el-radio-group>
-        </div>
+          <el-tab-pane label="标准配置" name="standard">
+            <el-table :data="currentDetail.standard_entries || []" border size="small" style="width: 100%;">
+              <el-table-column
+                v-for="col in entryColumns"
+                :key="col.prop"
+                :prop="col.prop"
+                :label="col.label"
+                :width="col.width"
+                :align="col.align || 'left'">
+                <template slot-scope="scope">
+                  {{ formatEntryField(scope.row, col) }}
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
 
-        <!-- HTML差异展示 -->
-        <div v-loading="diffLoading" class="diff-html-container" v-html="diffHtml"></div>
+          <el-tab-pane label="设备配置" name="device">
+            <el-table :data="currentDetail.device_entries || []" border size="small" style="width: 100%;">
+              <el-table-column
+                v-for="col in entryColumns"
+                :key="col.prop"
+                :prop="col.prop"
+                :label="col.label"
+                :width="col.width"
+                :align="col.align || 'left'">
+                <template slot-scope="scope">
+                  {{ formatEntryField(scope.row, col) }}
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-tab-pane>
+        </el-tabs>
       </div>
 
       <span slot="footer" class="dialog-footer">
         <el-button size="small" @click="detailDialogVisible = false">关闭</el-button>
+        <el-button
+          v-if="currentDetail && !currentDetail.change_ticket_id && currentDetail.status !== 'completed'"
+          type="primary"
+          size="small"
+          @click="handleCreateTicketSingle(currentDetail)">
+          创建工单
+        </el-button>
       </span>
     </el-dialog>
 
@@ -283,6 +345,21 @@
         :model="createRecordForm"
         :rules="createRecordRules"
         label-width="100px">
+
+        <el-form-item label="对象类型" prop="object_type">
+          <el-select
+            v-model="createRecordForm.object_type"
+            placeholder="请选择对象类型"
+            style="width: 100%;"
+            @change="handleCreateObjectTypeChange">
+            <el-option
+              v-for="item in objectTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value">
+            </el-option>
+          </el-select>
+        </el-form-item>
 
         <el-form-item label="设备" prop="device_ip">
           <el-select
@@ -306,11 +383,12 @@
         <el-form-item label="标准规则" prop="standard_id">
           <el-select
             v-model="createRecordForm.standard_id"
-            placeholder="请选择标准规则"
+            placeholder="请先选择对象类型"
+            filterable
             style="width: 100%;"
             clearable>
             <el-option
-              v-for="item in standardOptions"
+              v-for="item in createStandardOptions"
               :key="item.id"
               :label="`${item.name} - ${item.description || '无描述'}`"
               :value="item.id">
@@ -351,47 +429,59 @@
 </template>
 
 <script>
+import policyIssueApi from '@/api/mapis/policy_issue_interface'
 import prefixListApi from '@/api/mapis/prefix_list_interface'
+import aclApi from '@/api/mapis/acl_interface'
 import collectorApi from '@/api/mapis/collector_interface'
+import { addrSpecText, portSpecText, formatTimestamp } from './utils/spec_format'
 
 export default {
-  name: 'PrefixListIssues',
+  name: 'PolicyIssues',
 
   data() {
     return {
-      // 筛选条件
+      objectTypeOptions: [
+        { value: 'prefix_list', label: '前缀列表' },
+        { value: 'acl', label: 'ACL' },
+        { value: 'addrgroup', label: '地址组' },
+        { value: 'portgroup', label: '端口组' }
+      ],
+
       filterForm: {
+        object_type: '',
         standard_id: null,
         device: '',
         status: '',
         dateRange: null
       },
 
-      // 标准规则选项
+      // 筛选栏的标准规则选项，随对象类型变化
       standardOptions: [],
 
-      // 表格数据
       tableData: [],
       selectedRecords: [],
       currentPage: 1,
       pageSize: 20,
       totalCount: 0,
 
-      // 详情对话框
       detailDialogVisible: false,
       currentDetail: null,
-      diffMode: 'context', // 'context' | 'full'
+      detailTab: 'diff',
+      diffMode: 'context',
       diffHtml: '',
       diffLoading: false,
 
-      // 新建处理记录对话框
       createRecordDialogVisible: false,
       createRecordForm: {
+        object_type: '',
         device_ip: '',
         standard_id: null,
         remark: ''
       },
       createRecordRules: {
+        object_type: [
+          { required: true, message: '请选择对象类型', trigger: 'change' }
+        ],
         device_ip: [
           { required: true, message: '请选择设备', trigger: 'change' }
         ],
@@ -399,76 +489,161 @@ export default {
           { required: true, message: '请选择标准规则', trigger: 'change' }
         ]
       },
+      // 新建对话框里的标准规则选项
+      createStandardOptions: [],
 
-      // 设备列表
       deviceOptions: [],
       deviceLoading: false
     }
   },
 
+  computed: {
+    // 分页后的表格数据
+    pagedTableData() {
+      const start = (this.currentPage - 1) * this.pageSize
+      return this.tableData.slice(start, start + this.pageSize)
+    },
+
+    // 按对象类型给出条目列定义
+    entryColumns() {
+      const objectType = this.currentDetail ? this.currentDetail.object_type : ''
+
+      if (objectType === 'prefix_list') {
+        return [
+          { prop: 'seq', label: 'Seq', width: '70', align: 'center' },
+          { prop: 'action', label: '动作', width: '90', align: 'center' },
+          { prop: 'prefix', label: '前缀', width: '' },
+          { prop: 'ge', label: 'ge', width: '80', align: 'center' },
+          { prop: 'le', label: 'le', width: '80', align: 'center' }
+        ]
+      }
+      if (objectType === 'acl') {
+        return [
+          { prop: 'seq', label: 'Seq', width: '70', align: 'center' },
+          { prop: 'action', label: '动作', width: '90', align: 'center' },
+          { prop: 'protocol', label: '协议', width: '90', align: 'center' },
+          { prop: 'src', label: '源地址', width: '' },
+          { prop: 'src_port', label: '源端口', width: '120' },
+          { prop: 'dst', label: '目的地址', width: '' },
+          { prop: 'dst_port', label: '目的端口', width: '120' }
+        ]
+      }
+      if (objectType === 'addrgroup') {
+        return [
+          { prop: 'seq', label: 'Seq', width: '70', align: 'center' },
+          { prop: 'kind', label: '类型', width: '110', align: 'center' },
+          { prop: 'addresses', label: '地址', width: '' },
+          { prop: 'description', label: '描述', width: '200' }
+        ]
+      }
+      if (objectType === 'portgroup') {
+        return [
+          { prop: 'seq', label: 'Seq', width: '70', align: 'center' },
+          { prop: 'op', label: '运算符', width: '110', align: 'center' },
+          { prop: 'ports', label: '端口', width: '' },
+          { prop: 'description', label: '描述', width: '200' }
+        ]
+      }
+      return []
+    }
+  },
+
   mounted() {
-    this.loadStandardOptions()
+    this.loadStandardOptions('')
     this.loadData()
   },
 
   methods: {
-    // ==================== 工具方法 ====================
-
     formatTime(timestamp) {
-      if (!timestamp) return '-'
-      // 10位时间戳转换为毫秒
-      const time = timestamp.toString().length === 10 ? timestamp * 1000 : timestamp
-      const date = new Date(time)
+      return formatTimestamp(timestamp)
+    },
 
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      const seconds = String(date.getSeconds()).padStart(2, '0')
+    // created_at 存的是 10 位时间戳字符串，日期筛选要转成时间戳再比
+    // endOfDay=true 时取当天 23:59:59
+    dateToTimestamp(dateText, endOfDay) {
+      const [y, m, d] = dateText.split('-').map(Number)
+      const date = endOfDay
+        ? new Date(y, m - 1, d, 23, 59, 59)
+        : new Date(y, m - 1, d, 0, 0, 0)
+      return Math.floor(date.getTime() / 1000)
+    },
 
-      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+    // ==================== 选项加载 ====================
+
+    // object_type 为空时加载全部四类标准规则
+    loadStandardOptions(objectType) {
+      const tasks = []
+
+      if (!objectType || objectType === 'prefix_list') {
+        tasks.push(prefixListApi.getStandardsList({ is_active: 1 }).then(res => this.pickOptions(res, 'prefix')))
+      }
+      if (!objectType || objectType === 'acl') {
+        tasks.push(aclApi.getStandardsList({ is_active: 1 }).then(res => this.pickOptions(res, 'acl')))
+      }
+      if (!objectType || objectType === 'addrgroup') {
+        tasks.push(aclApi.getAddrGroupList({ is_active: 1 }).then(res => this.pickOptions(res, 'addrgroup')))
+      }
+      if (!objectType || objectType === 'portgroup') {
+        tasks.push(aclApi.getPortGroupList({ is_active: 1 }).then(res => this.pickOptions(res, 'portgroup')))
+      }
+
+      Promise.all(tasks.map(p => p.catch(() => []))).then(lists => {
+        const merged = [].concat.apply([], lists)
+        if (objectType) {
+          this.createStandardOptions = merged
+        } else {
+          this.standardOptions = merged
+        }
+      })
+    },
+
+    pickOptions(response, objectType) {
+      const res = response.data
+      if (!res || res.code !== 0) return []
+      return (res.data || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        object_type: objectType
+      }))
+    },
+
+    handleObjectTypeFilterChange(value) {
+      this.filterForm.standard_id = null
+      this.standardOptions = []
+      this.loadStandardOptions(value)
+    },
+
+    handleCreateObjectTypeChange() {
+      this.createRecordForm.standard_id = null
+      this.createStandardOptions = []
+      if (this.createRecordForm.object_type) {
+        this.loadStandardOptions(this.createRecordForm.object_type)
+      }
     },
 
     // ==================== 数据加载 ====================
 
-    loadStandardOptions() {
-      // 调用API加载标准规则选项
-      prefixListApi.getStandardsList({ is_active: 1 }).then(response => {
-        const res = response.data
-        if (res.code === 0) {
-          this.standardOptions = (res.data || []).map(item => ({
-            id: item.id,
-            name: item.name,
-            description: item.description
-          }))
-        }
-      }).catch(error => {
-        console.error('加载标准规则选项失败:', error)
-      })
-    },
-
     loadData() {
-      // 调用API加载处理记录
       const params = {
+        object_type: this.filterForm.object_type || undefined,
         standard_id: this.filterForm.standard_id,
         device: this.filterForm.device,
         status: this.filterForm.status
       }
 
-      // 处理日期范围
       if (this.filterForm.dateRange && this.filterForm.dateRange.length === 2) {
-        params.start_date = this.filterForm.dateRange[0]
-        params.end_date = this.filterForm.dateRange[1]
+        params.start_date = this.dateToTimestamp(this.filterForm.dateRange[0], false)
+        params.end_date = this.dateToTimestamp(this.filterForm.dateRange[1], true)
       }
 
-      prefixListApi.getIssueRecordsList(params).then(response => {
+      policyIssueApi.getIssueRecordsList(params).then(response => {
         const res = response.data
         if (res.code === 0) {
           this.tableData = res.data || []
           this.totalCount = this.tableData.length
         } else {
-          this.$message.error('加载处理记录失败')
+          this.$message.error(res.message || '加载处理记录失败')
         }
       }).catch(error => {
         console.error('加载处理记录失败:', error)
@@ -485,11 +660,14 @@ export default {
 
     handleReset() {
       this.filterForm = {
+        object_type: '',
         standard_id: null,
         device: '',
         status: '',
         dateRange: null
       }
+      this.currentPage = 1
+      this.loadStandardOptions('')
       this.loadData()
     },
 
@@ -498,29 +676,41 @@ export default {
     },
 
     checkSelectable(row) {
-      // 只有待处理的记录可以勾选
       return row.status === 'pending'
     },
 
     handleViewDetail(row) {
-      this.currentDetail = row
-      this.diffMode = 'context'
-      this.detailDialogVisible = true
-      this.loadDetailDiffComparison()
+      policyIssueApi.getIssueRecordDetail({ id: row.id }).then(response => {
+        const res = response.data
+        if (res.code === 0) {
+          this.currentDetail = res.data
+          this.detailTab = 'diff'
+          this.diffMode = 'context'
+          this.diffHtml = ''
+          this.detailDialogVisible = true
+          this.loadDetailDiffComparison()
+        } else {
+          this.$message.error(res.message || '获取详情失败')
+        }
+      }).catch(error => {
+        console.error('获取详情失败:', error)
+        this.$message.error('获取详情失败')
+      })
     },
 
     loadDetailDiffComparison() {
       if (!this.currentDetail) return
 
       this.diffLoading = true
-      prefixListApi.compareTextDiff({
+      policyIssueApi.compareTextDiff({
+        object_type: this.currentDetail.object_type,
         src_entries: this.currentDetail.device_entries || [],
         target_entries: this.currentDetail.standard_entries || [],
         full_diff: this.diffMode === 'full'
       }).then(response => {
         const res = response.data
         if (res.code === 0) {
-          this.diffHtml = res.data.html
+          this.diffHtml = res.data.html || ''
         } else {
           this.$message.error(res.message || '对比失败')
           this.diffHtml = '<p style="color: red;">对比失败</p>'
@@ -540,32 +730,46 @@ export default {
         return
       }
 
+      const objectTypes = new Set(this.selectedRecords.map(r => r.object_type))
+      if (objectTypes.size > 1) {
+        this.$message.warning('一个工单只能包含同一种对象类型的记录')
+        return
+      }
+
       this.$prompt('请输入工单标题（可选，留空则自动生成）', '批量创建工单', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
-        inputPlaceholder: '例如：前缀列表配置变更-生产环境'
+        inputPlaceholder: '例如：ACL 配置变更-生产环境'
       }).then(({ value }) => {
-        const issueIds = this.selectedRecords.map(r => r.id)
         const params = {
-          issue_ids: issueIds
+          issue_ids: this.selectedRecords.map(r => r.id)
         }
         if (value && value.trim()) {
           params.title = value.trim()
         }
-
-        prefixListApi.createChangeOrder(params).then(response => {
-          const res = response.data
-          if (res.code === 0) {
-            this.$message.success(`工单创建成功，工单ID: ${res.data.op_id}`)
-            this.loadData()
-          } else {
-            this.$message.error(res.message || '创建工单失败')
-          }
-        }).catch(error => {
-          console.error('创建工单失败:', error)
-          this.$message.error('创建工单失败')
-        })
+        this.submitChangeOrder(params)
       }).catch(() => {})
+    },
+
+    handleCreateTicketSingle(row) {
+      const params = { issue_ids: [row.id] }
+      this.submitChangeOrder(params)
+    },
+
+    submitChangeOrder(params) {
+      policyIssueApi.createChangeOrder(params).then(response => {
+        const res = response.data
+        if (res.code === 0) {
+          this.$message.success(`工单创建成功，工单ID: ${res.data.op_id}`)
+          this.detailDialogVisible = false
+          this.loadData()
+        } else {
+          this.$message.error(res.message || '创建工单失败')
+        }
+      }).catch(error => {
+        console.error('创建工单失败:', error)
+        this.$message.error('创建工单失败')
+      })
     },
 
     handleDelete(row) {
@@ -574,7 +778,7 @@ export default {
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
-        prefixListApi.deleteIssueRecord({ id: row.id }).then(response => {
+        policyIssueApi.deleteIssueRecord({ id: row.id }).then(response => {
           const res = response.data
           if (res.code === 0) {
             this.$message.success('删除成功')
@@ -591,14 +795,14 @@ export default {
 
     handleStatusChange(command) {
       const { row, status } = command
-      const statusText = status === 'completed' ? '已完成' : '忽略'
+      const statusText = this.getStatusText(status)
 
       this.$confirm(`确定将该记录标记为"${statusText}"吗？`, '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
-        prefixListApi.updateIssueStatus({ id: row.id, status: status }).then(response => {
+        policyIssueApi.updateIssueStatus({ id: row.id, status }).then(response => {
           const res = response.data
           if (res.code === 0) {
             this.$message.success('状态已更新')
@@ -613,20 +817,16 @@ export default {
       }).catch(() => {})
     },
 
-    handleViewTicket(ticketId) {
-      this.$message.info(`查看工单: ${ticketId}`)
-    },
-
     handleCreateRecord() {
       this.createRecordDialogVisible = true
       this.createRecordForm = {
+        object_type: '',
         device_ip: '',
         standard_id: null,
         remark: ''
       }
-      // 加载设备列表
+      this.createStandardOptions = []
       this.loadDeviceList()
-      // 重置表单验证
       this.$nextTick(() => {
         if (this.$refs.createRecordForm) {
           this.$refs.createRecordForm.clearValidate()
@@ -636,7 +836,6 @@ export default {
 
     loadDeviceList() {
       this.deviceLoading = true
-      // 调用接口获取设备列表
       collectorApi.getDevs({}, {})
         .then(res => {
           if (res.data && res.data.code === 0) {
@@ -658,48 +857,78 @@ export default {
 
     handleSubmitCreateRecord() {
       this.$refs.createRecordForm.validate((valid) => {
-        if (valid) {
-          const params = {
-            device_ip: this.createRecordForm.device_ip,
-            standard_id: this.createRecordForm.standard_id,
-            remark: this.createRecordForm.remark || ''
-          }
+        if (!valid) return
 
-          prefixListApi.createNewIssue(params).then(response => {
-            const res = response.data
-            if (res.code === 0) {
-              this.$message.success('处理记录创建成功')
-              this.createRecordDialogVisible = false
-              this.loadData()
-            } else {
-              this.$message.error(res.message || '创建失败')
-            }
-          }).catch(error => {
-            console.error('创建处理记录失败:', error)
-            this.$message.error('创建处理记录失败')
-          })
-        }
+        policyIssueApi.createNewIssue({
+          object_type: this.createRecordForm.object_type,
+          device_ip: this.createRecordForm.device_ip,
+          standard_id: this.createRecordForm.standard_id,
+          remark: this.createRecordForm.remark || ''
+        }).then(response => {
+          const res = response.data
+          if (res.code === 0) {
+            this.$message.success('处理记录创建成功')
+            this.createRecordDialogVisible = false
+            this.loadData()
+          } else {
+            this.$message.error(res.message || '创建失败')
+          }
+        }).catch(error => {
+          console.error('创建处理记录失败:', error)
+          this.$message.error('创建处理记录失败')
+        })
       })
     },
 
-    // ==================== 工具方法 ====================
+    // ==================== 展示辅助 ====================
+
+    formatEntryField(entry, col) {
+      if (!entry) return '-'
+      const value = entry[col.prop]
+
+      switch (col.prop) {
+        case 'src':
+        case 'dst':
+          return addrSpecText(value) || 'any'
+        case 'src_port':
+        case 'dst_port':
+          return portSpecText(value) || 'any'
+        case 'addresses':
+        case 'ports':
+          return (value || []).join(', ')
+        case 'description':
+          return value || '-'
+        default:
+          return value === null || value === undefined || value === '' ? '-' : value
+      }
+    },
+
+    getObjectTypeTag(objectType) {
+      const typeMap = {
+        prefix_list: '',
+        acl: 'success',
+        addrgroup: 'warning',
+        portgroup: 'info'
+      }
+      return typeMap[objectType] || ''
+    },
 
     getStatusTagType(status) {
       const typeMap = {
-        'pending': 'warning',
-        'processing': 'primary',
-        'completed': 'success',
-        'ignored': 'info'
+        pending: 'warning',
+        processing: 'primary',
+        completed: 'success',
+        ignored: 'info'
       }
       return typeMap[status] || ''
     },
 
     getStatusText(status) {
       const textMap = {
-        'pending': '待处理',
-        'processing': '处理中',
-        'completed': '已完成',
-        'ignored': '已忽略'
+        pending: '待处理',
+        processing: '处理中',
+        completed: '已完成',
+        ignored: '已忽略'
       }
       return textMap[status] || status
     },
@@ -707,19 +936,17 @@ export default {
     handleSizeChange(val) {
       this.pageSize = val
       this.currentPage = 1
-      this.loadData()
     },
 
     handleCurrentChange(val) {
       this.currentPage = val
-      this.loadData()
     }
   }
 }
 </script>
 
 <style scoped>
-.prefix-list-issues-page {
+.policy-issues-page {
   padding: 20px;
   background: #f0f2f5;
   min-height: calc(100vh - 100px);
@@ -742,7 +969,6 @@ export default {
   padding: 10px 0;
 }
 
-/* 文本对比HTML容器样式 */
 .diff-html-container {
   max-height: 600px;
   overflow: auto;

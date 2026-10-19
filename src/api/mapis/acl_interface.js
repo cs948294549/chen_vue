@@ -1,175 +1,219 @@
+import axios from "../axios"
+
 /*
-ACL 管理相关接口（含模拟数据，后端就绪后替换为真实 axios 调用）
+ACL 管理相关接口（含地址组、端口组）
 */
 
-const FP1 = 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2'
-const FP2 = 'b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3'
-const FP3 = 'c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4'
-
-const MOCK_STANDARDS = [
-  {
-    id: 1, name: 'PERMIT_INTERNET_OUT', acl_number: null, acl_type: 'ipv4', acl_kind: 'advanced',
-    fingerprint: FP1, rule_count: 3, description: '允许内网访问互联网出口', is_active: 1,
-    created_at: '1726300000', updated_at: '1726300000', created_by: 'admin',
-    entries: [
-      { seq: 10, action: 'permit', protocol: 'tcp', src: { type: 'network', address: '10.0.0.0/8' }, src_port: null, dst: { type: 'any' }, dst_port: { type: 'direct', op: 'eq', ports: [80] }, options: {} },
-      { seq: 20, action: 'permit', protocol: 'tcp', src: { type: 'network', address: '10.0.0.0/8' }, src_port: null, dst: { type: 'any' }, dst_port: { type: 'direct', op: 'eq', ports: [443] }, options: {} },
-      { seq: 100, action: 'deny', protocol: 'ip', src: { type: 'any' }, src_port: null, dst: { type: 'any' }, dst_port: null, options: {} }
-    ]
-  },
-  {
-    id: 2, name: '2000', acl_number: 2000, acl_type: 'ipv4', acl_kind: 'basic',
-    fingerprint: FP2, rule_count: 2, description: '允许管理网段访问', is_active: 1,
-    created_at: '1726200000', updated_at: '1726200000', created_by: 'admin',
-    entries: [
-      { seq: 5, action: 'permit', protocol: 'ip', src: { type: 'network', address: '172.16.0.0/16' }, src_port: null, dst: { type: 'any' }, dst_port: null, options: {} },
-      { seq: 100, action: 'deny', protocol: 'ip', src: { type: 'any' }, src_port: null, dst: { type: 'any' }, dst_port: null, options: {} }
-    ]
-  },
-  {
-    id: 3, name: 'DENY_SCAN_IN', acl_number: null, acl_type: 'ipv4', acl_kind: 'advanced',
-    fingerprint: FP3, rule_count: 2, description: '拒绝端口扫描流量入方向', is_active: 0,
-    created_at: '1726100000', updated_at: '1726100000', created_by: 'netops',
-    entries: [
-      { seq: 10, action: 'deny', protocol: 'tcp', src: { type: 'any' }, src_port: null, dst: { type: 'network', address: '10.100.0.0/16' }, dst_port: { type: 'direct', op: 'range', ports: [1, 1024] }, options: { log: true } },
-      { seq: 100, action: 'permit', protocol: 'ip', src: { type: 'any' }, src_port: null, dst: { type: 'any' }, dst_port: null, options: {} }
-    ]
-  }
-]
-
-const MOCK_RECORDS = [
-  { id: 1, device_ip: '10.1.1.1', device_name: 'dc01-csw01', vendor: 'cisco_nx', acl_name: 'PERMIT_INTERNET_OUT', acl_number: null, acl_type: 'ipv4', acl_kind: 'advanced', rule_count: 3, fingerprint: FP1, dangling_count: 0, entries: MOCK_STANDARDS[0].entries, collected_at: '1726380000' },
-  { id: 2, device_ip: '10.1.1.2', device_name: 'dc01-csw02', vendor: 'cisco_nx', acl_name: 'PERMIT_INTERNET_OUT', acl_number: null, acl_type: 'ipv4', acl_kind: 'advanced', rule_count: 3, fingerprint: FP1, dangling_count: 0, entries: MOCK_STANDARDS[0].entries, collected_at: '1726380000' },
-  { id: 3, device_ip: '10.2.1.1', device_name: 'dc02-csw01', vendor: 'cisco_nx', acl_name: 'PERMIT_INTERNET_OUT', acl_number: null, acl_type: 'ipv4', acl_kind: 'advanced', rule_count: 2, fingerprint: 'drifted000000000000000000000000000000000000000000000000000000000000', dangling_count: 0, entries: [MOCK_STANDARDS[0].entries[0], MOCK_STANDARDS[0].entries[2]], collected_at: '1726370000' },
-  { id: 4, device_ip: '10.1.1.1', device_name: 'dc01-csw01', vendor: 'cisco_nx', acl_name: '2000', acl_number: 2000, acl_type: 'ipv4', acl_kind: 'basic', rule_count: 2, fingerprint: FP2, dangling_count: 0, entries: MOCK_STANDARDS[1].entries, collected_at: '1726380000' }
-]
-
-const MOCK_ISSUES = [
-  { id: 1, object_type: 'acl', standard_id: 1, standard_name: 'PERMIT_INTERNET_OUT', device_ip: '10.2.1.1', device_name: 'dc02-csw01', device_vendor: 'cisco_nx', issue_type: 'drifted', dangling_refs: null, standard_entries: MOCK_STANDARDS[0].entries, device_entries: [MOCK_STANDARDS[0].entries[0], MOCK_STANDARDS[0].entries[2]], status: 'pending', change_ticket_id: null, created_by: 'system', created_at: '1726400000', processed_at: null, remark: '' },
-  { id: 2, object_type: 'acl', standard_id: 1, standard_name: 'PERMIT_INTERNET_OUT', device_ip: '10.3.1.1', device_name: 'dc03-csw01', device_vendor: 'huawei', issue_type: 'missing', dangling_refs: null, standard_entries: MOCK_STANDARDS[0].entries, device_entries: [], status: 'pending', change_ticket_id: null, created_by: 'admin', created_at: '1726390000', processed_at: null, remark: '新增设备需补充配置' }
-]
-
-let nextStandardId = 4
-let nextIssueId = 3
-const standards = MOCK_STANDARDS.map(s => ({ ...s }))
-const issues = MOCK_ISSUES.map(i => ({ ...i }))
-
-function mock(data) {
-  return Promise.resolve({ data: { code: 0, data } })
-}
-
 export default {
-  getStandardsList(data) {
-    let list = standards.slice()
-    if (data && data.is_active !== undefined && data.is_active !== '') {
-      list = list.filter(s => s.is_active === data.is_active)
-    }
-    if (data && data.keyword) {
-      list = list.filter(s => s.name.includes(data.keyword))
-    }
-    return mock(list.map(s => ({ ...s, entries: undefined })))
+  // ==================== 规则制定（Standards） ====================
+
+  // 获取标准规则列表
+  getStandardsList(data, params) {
+    return axios.post("/acl/standards/list", data, params)
   },
 
-  getStandardDetail(data) {
-    const s = standards.find(s => s.id === data.id)
-    return mock(s ? { ...s } : null)
+  // 获取标准规则详情
+  getStandardDetail(data, params) {
+    return axios.post("/acl/standards/detail", data, params)
   },
 
-  createStandard(data) {
-    const s = { ...data, id: nextStandardId++, created_at: String(Math.floor(Date.now() / 1000)), updated_at: String(Math.floor(Date.now() / 1000)), rule_count: (data.entries || []).length }
-    standards.push(s)
-    return mock({ id: s.id })
+  // 创建标准规则
+  createStandard(data, params) {
+    return axios.post("/acl/standards/create", data, params)
   },
 
-  updateStandard(data) {
-    const idx = standards.findIndex(s => s.id === data.id)
-    if (idx !== -1) {
-      standards[idx] = { ...standards[idx], ...data, updated_at: String(Math.floor(Date.now() / 1000)), rule_count: (data.entries || standards[idx].entries || []).length }
-    }
-    return mock(null)
+  // 更新标准规则
+  updateStandard(data, params) {
+    return axios.post("/acl/standards/update", data, params)
   },
 
-  deleteStandard(data) {
-    const idx = standards.findIndex(s => s.id === data.id)
-    if (idx !== -1) standards.splice(idx, 1)
-    return mock(null)
+  // 删除标准规则
+  deleteStandard(data, params) {
+    return axios.post("/acl/standards/delete", data, params)
   },
 
-  toggleStandardActive(data) {
-    const s = standards.find(s => s.id === data.id)
-    if (s) s.is_active = s.is_active ? 0 : 1
-    return mock(null)
+  // 切换标准规则启用状态
+  toggleStandardActive(data, params) {
+    return axios.post("/acl/standards/toggle_active", data, params)
   },
 
-  getStandardStatistics(data) {
-    const stats = { 1: { total: 3, matched: 2, matched_other: 0, drifted: 1 }, 2: { total: 1, matched: 1, matched_other: 0, drifted: 0 }, 3: { total: 0, matched: 0, matched_other: 0, drifted: 0 } }
-    return mock(stats[data.standard_id] || { total: 0, matched: 0, matched_other: 0, drifted: 0 })
+  // 获取标准规则的设备应用统计
+  getStandardStatistics(data, params) {
+    return axios.post("/acl/standards/statistics", data, params)
   },
 
-  getStandardDeviceList(data) {
-    const deviceMap = {
-      1: [
-        { device_ip: '10.1.1.1', device_name: 'dc01-csw01', vendor: 'cisco_nx', fingerprint: FP1, match_status: 'matched', collected_at: '1726380000' },
-        { device_ip: '10.1.1.2', device_name: 'dc01-csw02', vendor: 'cisco_nx', fingerprint: FP1, match_status: 'matched', collected_at: '1726380000' },
-        { device_ip: '10.2.1.1', device_name: 'dc02-csw01', vendor: 'cisco_nx', fingerprint: 'drifted000000000000000000000000000000000000000000000000000000000000', match_status: 'drifted', collected_at: '1726370000' }
-      ],
-      2: [
-        { device_ip: '10.1.1.1', device_name: 'dc01-csw01', vendor: 'cisco_nx', fingerprint: FP2, match_status: 'matched', collected_at: '1726380000' }
-      ]
-    }
-    return mock(deviceMap[data.standard_id] || [])
+  // 获取标准规则关联的设备列表
+  getStandardDeviceList(data, params) {
+    return axios.post("/acl/standards/device_list", data, params)
   },
 
-  getRecordsList(data) {
-    let list = MOCK_RECORDS.slice()
-    if (data && data.acl_name) list = list.filter(r => r.acl_name.includes(data.acl_name))
-    if (data && data.device) list = list.filter(r => r.device_ip.includes(data.device) || r.device_name.includes(data.device))
-    if (data && data.vendor) list = list.filter(r => r.vendor === data.vendor)
-    if (data && data.acl_type) list = list.filter(r => r.acl_type === data.acl_type)
-    return mock(list)
+  // ==================== 地址组（AddrGroup） ====================
+
+  // 获取地址组标准规则列表
+  getAddrGroupList(data, params) {
+    return axios.post("/acl/addrgroup/standards/list", data, params)
   },
 
-  getIssueRecordsList(data) {
-    let list = issues.slice()
-    if (data && data.standard_id) list = list.filter(i => i.standard_id === data.standard_id)
-    if (data && data.device) list = list.filter(i => i.device_ip.includes(data.device) || i.device_name.includes(data.device))
-    if (data && data.status) list = list.filter(i => i.status === data.status)
-    return mock(list)
+  // 获取地址组标准规则详情
+  getAddrGroupDetail(data, params) {
+    return axios.post("/acl/addrgroup/standards/detail", data, params)
   },
 
-  batchCreateIssueRecords(data) {
-    return mock({ created: (data.issue_ids || []).length })
+  // 创建地址组标准规则
+  createAddrGroup(data, params) {
+    return axios.post("/acl/addrgroup/standards/create", data, params)
   },
 
-  createNewIssue(data) {
-    const s = standards.find(s => s.id === data.standard_id)
-    issues.push({ id: nextIssueId++, object_type: 'acl', standard_id: data.standard_id, standard_name: s ? s.name : '', device_ip: data.device_ip, device_name: data.device_ip, device_vendor: 'unknown', issue_type: 'missing', dangling_refs: null, standard_entries: s ? s.entries : [], device_entries: [], status: 'pending', change_ticket_id: null, created_by: 'manual', created_at: String(Math.floor(Date.now() / 1000)), processed_at: null, remark: data.remark || '' })
-    return mock(null)
+  // 更新地址组标准规则
+  updateAddrGroup(data, params) {
+    return axios.post("/acl/addrgroup/standards/update", data, params)
   },
 
-  deleteIssueRecord(data) {
-    const idx = issues.findIndex(i => i.id === data.id)
-    if (idx !== -1) issues.splice(idx, 1)
-    return mock(null)
+  // 删除地址组标准规则
+  deleteAddrGroup(data, params) {
+    return axios.post("/acl/addrgroup/standards/delete", data, params)
   },
 
-  updateIssueStatus(data) {
-    const issue = issues.find(i => i.id === data.id)
-    if (issue) { issue.status = data.status; if (data.status === 'completed') issue.processed_at = String(Math.floor(Date.now() / 1000)) }
-    return mock(null)
+  // 切换地址组启用状态
+  toggleAddrGroupActive(data, params) {
+    return axios.post("/acl/addrgroup/standards/toggle_active", data, params)
   },
 
-  getIssueStatistics(data) {
-    const list = data && data.standard_id ? issues.filter(i => i.standard_id === data.standard_id) : issues
-    return mock({ total: list.length, pending: list.filter(i => i.status === 'pending').length, processing: list.filter(i => i.status === 'processing').length, completed: list.filter(i => i.status === 'completed').length, ignored: list.filter(i => i.status === 'ignored').length })
+  // 获取地址组标准的设备应用统计
+  getAddrGroupStatistics(data, params) {
+    return axios.post("/acl/addrgroup/standards/statistics", data, params)
   },
 
-  compareTextDiff(data) {
-    const html = `<table class="diff" cellspacing="0"><tr><td class="diff_header">标准配置</td><td class="diff_header">设备配置</td></tr><tr><td style="background:#e8ffe8;padding:4px 8px;font-family:monospace;font-size:12px;">+ 20 permit tcp 10.0.0.0/8 any eq 443</td><td style="background:#ffe8e8;padding:4px 8px;font-family:monospace;font-size:12px;">（缺少此条）</td></tr><tr><td style="padding:4px 8px;font-family:monospace;font-size:12px;"> 10 permit tcp 10.0.0.0/8 any eq 80</td><td style="padding:4px 8px;font-family:monospace;font-size:12px;"> 10 permit tcp 10.0.0.0/8 any eq 80</td></tr><tr><td style="padding:4px 8px;font-family:monospace;font-size:12px;"> 100 deny ip any any</td><td style="padding:4px 8px;font-family:monospace;font-size:12px;"> 100 deny ip any any</td></tr></table>`
-    return mock({ diff_html: html })
+  // 获取地址组标准关联的设备列表
+  getAddrGroupDeviceList(data, params) {
+    return axios.post("/acl/addrgroup/standards/device_list", data, params)
   },
 
-  createChangeOrder(data) {
-    return mock({ order_id: 'CHG-' + Date.now(), message: '工单创建成功（模拟）' })
+  // 获取地址组的设备配置记录列表
+  getAddrGroupRecordsList(data, params) {
+    return axios.post("/acl/addrgroup/records/list", data, params)
+  },
+
+  // 地址组配置文本对比
+  compareAddrGroupTextDiff(data, params) {
+    return axios.post("/acl/addrgroup/compare/text_diff", data, params)
+  },
+
+  // 批量创建地址组问题处理记录
+  batchCreateAddrGroupIssueRecords(data, params) {
+    return axios.post("/acl/addrgroup/issues/batch_create", data, params)
+  },
+
+  // ==================== 端口组（PortGroup） ====================
+
+  // 获取端口组标准规则列表
+  getPortGroupList(data, params) {
+    return axios.post("/acl/portgroup/standards/list", data, params)
+  },
+
+  // 获取端口组标准规则详情
+  getPortGroupDetail(data, params) {
+    return axios.post("/acl/portgroup/standards/detail", data, params)
+  },
+
+  // 创建端口组标准规则
+  createPortGroup(data, params) {
+    return axios.post("/acl/portgroup/standards/create", data, params)
+  },
+
+  // 更新端口组标准规则
+  updatePortGroup(data, params) {
+    return axios.post("/acl/portgroup/standards/update", data, params)
+  },
+
+  // 删除端口组标准规则
+  deletePortGroup(data, params) {
+    return axios.post("/acl/portgroup/standards/delete", data, params)
+  },
+
+  // 切换端口组启用状态
+  togglePortGroupActive(data, params) {
+    return axios.post("/acl/portgroup/standards/toggle_active", data, params)
+  },
+
+  // 获取端口组标准的设备应用统计
+  getPortGroupStatistics(data, params) {
+    return axios.post("/acl/portgroup/standards/statistics", data, params)
+  },
+
+  // 获取端口组标准关联的设备列表
+  getPortGroupDeviceList(data, params) {
+    return axios.post("/acl/portgroup/standards/device_list", data, params)
+  },
+
+  // 获取端口组的设备配置记录列表
+  getPortGroupRecordsList(data, params) {
+    return axios.post("/acl/portgroup/records/list", data, params)
+  },
+
+  // 端口组配置文本对比
+  comparePortGroupTextDiff(data, params) {
+    return axios.post("/acl/portgroup/compare/text_diff", data, params)
+  },
+
+  // 批量创建端口组问题处理记录
+  batchCreatePortGroupIssueRecords(data, params) {
+    return axios.post("/acl/portgroup/issues/batch_create", data, params)
+  },
+
+  // ==================== 设备配置记录（Records） ====================
+
+  // 获取设备配置记录列表
+  getRecordsList(data, params) {
+    return axios.post("/acl/records/list", data, params)
+  },
+
+  // ==================== 问题处理记录（Issues） ====================
+
+  // 获取问题处理记录列表
+  getIssueRecordsList(data, params) {
+    return axios.post("/acl/issues/list", data, params)
+  },
+
+  // 批量创建变更工单，data.issue_ids
+  batchCreateIssueRecords(data, params) {
+    return axios.post("/acl/change_order/batch_create", data, params)
+  },
+
+  // 批量创建问题处理记录（配置管理弹窗勾选设备后调用）
+  batchCreateIssues(data, params) {
+    return axios.post("/acl/issues/batch_create", data, params)
+  },
+
+  // 创建新的问题处理记录（手动创建）
+  createNewIssue(data, params) {
+    return axios.post("/acl/issues/new_issue", data, params)
+  },
+
+  // 删除问题处理记录
+  deleteIssueRecord(data, params) {
+    return axios.post("/acl/issues/delete", data, params)
+  },
+
+  // 更新问题处理记录状态
+  updateIssueStatus(data, params) {
+    return axios.post("/acl/issues/update_status", data, params)
+  },
+
+  // 获取问题处理统计
+  getIssueStatistics(data, params) {
+    return axios.post("/acl/issues/statistics", data, params)
+  },
+
+  // 配置文本对比
+  compareTextDiff(data, params) {
+    return axios.post("/acl/compare/text_diff", data, params)
+  },
+
+  // ==================== 变更工单（Change Order） ====================
+
+  // 创建变更工单，可用 standard_id + device_ip 或 issue_ids
+  createChangeOrder(data, params) {
+    return axios.post("/acl/change_order/create", data, params)
   }
 }
