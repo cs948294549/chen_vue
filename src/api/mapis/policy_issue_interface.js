@@ -25,11 +25,6 @@ export default {
     return axios.post("/policy/issues/update_status", data, params)
   },
 
-  // 获取问题统计
-  getIssueStatistics(data, params) {
-    return axios.post("/policy/issues/statistics", data, params)
-  },
-
   // 配置差异对比（issue_id 或 standard_id+device_ip 或直接传 src_entries+target_entries）
   compareTextDiff(data, params) {
     return axios.post("/policy/issues/compare/text_diff", data, params)

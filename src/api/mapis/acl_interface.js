@@ -32,11 +32,6 @@ export default {
     return axios.post("/acl/standards/delete", data, params)
   },
 
-  // 切换标准规则启用状态
-  toggleStandardActive(data, params) {
-    return axios.post("/acl/standards/toggle_active", data, params)
-  },
-
   // 获取标准规则的设备应用统计
   getStandardStatistics(data, params) {
     return axios.post("/acl/standards/statistics", data, params)
@@ -72,11 +67,6 @@ export default {
   // 删除地址组标准规则
   deleteAddrGroup(data, params) {
     return axios.post("/acl/addrgroup/standards/delete", data, params)
-  },
-
-  // 切换地址组启用状态
-  toggleAddrGroupActive(data, params) {
-    return axios.post("/acl/addrgroup/standards/toggle_active", data, params)
   },
 
   // 获取地址组标准的设备应用统计
@@ -131,11 +121,6 @@ export default {
     return axios.post("/acl/portgroup/standards/delete", data, params)
   },
 
-  // 切换端口组启用状态
-  togglePortGroupActive(data, params) {
-    return axios.post("/acl/portgroup/standards/toggle_active", data, params)
-  },
-
   // 获取端口组标准的设备应用统计
   getPortGroupStatistics(data, params) {
     return axios.post("/acl/portgroup/standards/statistics", data, params)
@@ -170,50 +155,13 @@ export default {
 
   // ==================== 问题处理记录（Issues） ====================
 
-  // 获取问题处理记录列表
-  getIssueRecordsList(data, params) {
-    return axios.post("/acl/issues/list", data, params)
-  },
-
-  // 批量创建变更工单，data.issue_ids
-  batchCreateIssueRecords(data, params) {
-    return axios.post("/acl/change_order/batch_create", data, params)
-  },
-
   // 批量创建问题处理记录（配置管理弹窗勾选设备后调用）
   batchCreateIssues(data, params) {
     return axios.post("/acl/issues/batch_create", data, params)
   },
 
-  // 创建新的问题处理记录（手动创建）
-  createNewIssue(data, params) {
-    return axios.post("/acl/issues/new_issue", data, params)
-  },
-
-  // 删除问题处理记录
-  deleteIssueRecord(data, params) {
-    return axios.post("/acl/issues/delete", data, params)
-  },
-
-  // 更新问题处理记录状态
-  updateIssueStatus(data, params) {
-    return axios.post("/acl/issues/update_status", data, params)
-  },
-
-  // 获取问题处理统计
-  getIssueStatistics(data, params) {
-    return axios.post("/acl/issues/statistics", data, params)
-  },
-
   // 配置文本对比
   compareTextDiff(data, params) {
     return axios.post("/acl/compare/text_diff", data, params)
-  },
-
-  // ==================== 变更工单（Change Order） ====================
-
-  // 创建变更工单，可用 standard_id + device_ip 或 issue_ids
-  createChangeOrder(data, params) {
-    return axios.post("/acl/change_order/create", data, params)
   }
 }
