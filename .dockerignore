@@ -16,7 +16,6 @@ chen_vue/
 *.md
 docs/
 
-# Docker 自身
-docker/
-Dockerfile
+# 说明: 不要排除 docker/ 和 Dockerfile 本身,
+# nginx.conf 等资源需要被 COPY 进镜像, 排除会导致 "not found" 构建失败
 docker-compose.yml
