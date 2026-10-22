@@ -54,7 +54,7 @@
     <div v-if="groupMode === 'fingerprint'" class="fingerprint-group-view">
       <el-collapse v-model="activeFingerprints" accordion>
         <el-collapse-item
-          v-for="(group, index) in fingerprintGroups"
+          v-for="group in pagedFingerprintGroups"
           :key="group.fingerprint"
           :name="group.fingerprint">
 
@@ -126,7 +126,19 @@
         </el-collapse-item>
       </el-collapse>
 
-      <el-empty v-if="fingerprintGroups.length === 0" description="暂无数据"></el-empty>
+      <el-empty v-if="fingerprintTotal === 0" description="暂无数据"></el-empty>
+
+      <el-pagination
+        v-if="fingerprintTotal > 0"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+        :current-page="currentPage"
+        :page-sizes="[10, 20, 50, 100]"
+        :page-size="pageSize"
+        layout="total, sizes, prev, pager, next"
+        :total="fingerprintTotal"
+        style="margin-top: 20px; text-align: right;">
+      </el-pagination>
     </div>
 
     <!-- 按设备展示视图 -->
@@ -168,7 +180,7 @@
         <el-table-column prop="entry_count" label="条目数量" width="100" align="center">
           <template slot-scope="scope">
             <el-tag type="info" size="small">
-              {{ scope.row.entries.entries.length }} 条
+              {{ scope.row.entry_count }} 条
             </el-tag>
           </template>
         </el-table-column>
@@ -194,14 +206,14 @@
 
       <!-- 分页 -->
       <el-pagination
-        v-if="deviceRecords.length > 0"
+        v-if="filteredDeviceTotal > 0"
         @size-change="handleSizeChange"
         @current-change="handleCurrentChange"
         :current-page="currentPage"
         :page-sizes="[10, 20, 50, 100]"
         :page-size="pageSize"
         layout="total, sizes, prev, pager, next, jumper"
-        :total="deviceRecords.length"
+        :total="filteredDeviceTotal"
         style="margin-top: 20px; text-align: right;">
       </el-pagination>
     </div>
@@ -332,6 +344,8 @@ export default {
 
       // 按指纹分组数据
       fingerprintGroups: [],
+      pagedFingerprintGroups: [],
+      fingerprintTotal: 0,
       activeFingerprints: [],
 
       // 按设备展示数据
@@ -346,7 +360,8 @@ export default {
   },
 
   computed: {
-    filteredDeviceRecords() {
+    // 设备视图：本地筛选后的完整列表
+    filteredDeviceList() {
       let data = this.deviceRecords
 
       if (this.filterForm.pl_name) {
@@ -366,9 +381,56 @@ export default {
         data = data.filter(item => item.vendor_type === this.filterForm.vendor_type)
       }
 
+      return data
+    },
+
+    filteredDeviceTotal() {
+      return this.filteredDeviceList.length
+    },
+
+    // 设备视图：当前页数据
+    filteredDeviceRecords() {
       const start = (this.currentPage - 1) * this.pageSize
-      const end = start + this.pageSize
-      return data.slice(start, end)
+      return this.filteredDeviceList.slice(start, start + this.pageSize)
+    },
+
+    // 指纹视图：名称作用于分组，设备/厂商作用于组内主机
+    filteredFingerprintGroups() {
+      let groups = this.fingerprintGroups
+
+      if (this.filterForm.pl_name) {
+        const keyword = this.filterForm.pl_name.toLowerCase()
+        groups = groups.filter(group => (group.pl_name || '').toLowerCase().includes(keyword))
+      }
+
+      const device = this.filterForm.device
+      const vendor = this.filterForm.vendor_type
+      if (device || vendor) {
+        const deviceKeyword = device ? device.toLowerCase() : ''
+        groups = groups.map(group => {
+          const hosts = group.hosts.filter(host => {
+            const deviceMatch = !deviceKeyword ||
+              host.device_ip.includes(deviceKeyword) ||
+              (host.device_name || '').toLowerCase().includes(deviceKeyword)
+            const vendorMatch = !vendor || host.vendor_type === vendor
+            return deviceMatch && vendorMatch
+          })
+          return { ...group, hosts, device_count: hosts.length }
+        }).filter(group => group.hosts.length > 0)
+      }
+
+      return groups
+    }
+  },
+
+  watch: {
+    // 筛选结果变化后重算分页，页码越界时回到第一页
+    filteredFingerprintGroups(val) {
+      const maxPage = Math.max(1, Math.ceil(val.length / this.pageSize))
+      if (this.currentPage > maxPage) {
+        this.currentPage = 1
+      }
+      this.applyPagination()
     }
   },
 
@@ -397,6 +459,13 @@ export default {
 
     // ==================== 数据加载 ====================
 
+    // entries 既可能是条目数组，也可能是 {entries: [...]}
+    entryList(entries) {
+      if (Array.isArray(entries)) return entries
+      if (entries && Array.isArray(entries.entries)) return entries.entries
+      return []
+    },
+
     loadData() {
       const params = {
         pl_name: this.filterForm.pl_name || undefined,
@@ -409,43 +478,23 @@ export default {
         if (res.code === 0) {
           const records = res.data || []
 
-          if (this.groupMode === 'fingerprint') {
-            // 按指纹分组
-            const fingerprintMap = {}
-            records.forEach(record => {
-              if (!fingerprintMap[record.fingerprint]) {
-                fingerprintMap[record.fingerprint] = {
-                  pl_name: record.pl_name,
-                  fingerprint: record.fingerprint,
-                  entries: record.entries,
-                  hosts: []
-                }
-              }
-              fingerprintMap[record.fingerprint].hosts.push({
-                device_ip: record.device_ip,
-                device_name: record.device_name,
-                vendor_type: record.vendor,
-                collected_at: record.collected_at
-              })
-            })
-
-            this.fingerprintGroups = Object.values(fingerprintMap).map(group => ({
-              ...group,
-              device_count: group.hosts.length,
-              entry_count: group.entries.length
-            }))
-          } else {
-            // 按设备展示
-            this.deviceRecords = records.map(record => ({
+          this.deviceRecords = records.map(record => {
+            const entries = this.entryList(record.entries)
+            return {
               device_ip: record.device_ip,
               device_name: record.device_name,
               vendor_type: record.vendor,
               pl_name: record.pl_name,
               fingerprint: record.fingerprint,
-              entries: record.entries,
+              entries,
+              entry_count: entries.length,
               collected_at: record.collected_at
-            }))
-          }
+            }
+          })
+
+          this.buildFingerprintGroups(records)
+          this.currentPage = 1
+          this.applyPagination()
         } else {
           this.$message.error(res.message || '加载数据失败')
         }
@@ -453,6 +502,47 @@ export default {
         console.error('加载数据失败:', error)
         this.$message.error('加载数据失败')
       })
+    },
+
+    buildFingerprintGroups(records) {
+      const fingerprintMap = {}
+      records.forEach(record => {
+        if (!fingerprintMap[record.fingerprint]) {
+          const entries = this.entryList(record.entries)
+          fingerprintMap[record.fingerprint] = {
+            pl_name: record.pl_name,
+            fingerprint: record.fingerprint,
+            entries,
+            entry_count: entries.length,
+            hosts: []
+          }
+        }
+        fingerprintMap[record.fingerprint].hosts.push({
+          device_ip: record.device_ip,
+          device_name: record.device_name,
+          vendor_type: record.vendor,
+          collected_at: record.collected_at
+        })
+      })
+
+      this.fingerprintGroups = Object.values(fingerprintMap).map(group => ({
+        ...group,
+        device_count: group.hosts.length
+      }))
+    },
+
+    applyPagination() {
+      const groups = this.filteredFingerprintGroups
+      this.fingerprintTotal = groups.length
+      const start = (this.currentPage - 1) * this.pageSize
+      const pageGroups = groups.slice(start, start + this.pageSize)
+
+      // 当前展开的分组不在本页时收起，避免跨页残留
+      if (this.activeFingerprints && !pageGroups.some(g => g.fingerprint === this.activeFingerprints)) {
+        this.activeFingerprints = ''
+      }
+
+      this.pagedFingerprintGroups = pageGroups
     },
 
     // ==================== 操作方法 ====================
@@ -479,6 +569,7 @@ export default {
 
     handleGroupModeChange() {
       this.currentPage = 1
+      this.applyPagination()
     },
 
     handleViewConfig(group) {
@@ -544,10 +635,12 @@ export default {
     handleSizeChange(val) {
       this.pageSize = val
       this.currentPage = 1
+      this.applyPagination()
     },
 
     handleCurrentChange(val) {
       this.currentPage = val
+      this.applyPagination()
     },
 
     // ==================== 创建标准规则 ====================

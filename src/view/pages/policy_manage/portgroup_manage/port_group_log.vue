@@ -49,7 +49,7 @@
     <div v-if="groupMode === 'fingerprint'" class="fingerprint-group-view">
       <el-collapse v-model="activeFingerprints" accordion>
         <el-collapse-item
-          v-for="group in fingerprintGroups"
+          v-for="group in pagedFingerprintGroups"
           :key="group.fingerprint"
           :name="group.fingerprint">
 
@@ -103,7 +103,19 @@
         </el-collapse-item>
       </el-collapse>
 
-      <el-empty v-if="fingerprintGroups.length === 0" description="暂无数据"></el-empty>
+      <el-empty v-if="fingerprintTotal === 0" description="暂无数据"></el-empty>
+
+      <el-pagination
+        v-if="fingerprintTotal > 0"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+        :current-page="currentPage"
+        :page-sizes="[10, 20, 50, 100]"
+        :page-size="pageSize"
+        layout="total, sizes, prev, pager, next"
+        :total="fingerprintTotal"
+        style="margin-top: 20px; text-align: right;">
+      </el-pagination>
     </div>
 
     <!-- 按设备展示视图 -->
@@ -267,6 +279,8 @@ export default {
       groupMode: 'fingerprint',
 
       fingerprintGroups: [],
+      pagedFingerprintGroups: [],
+      fingerprintTotal: 0,
       activeFingerprints: [],
 
       deviceRecords: [],
@@ -279,24 +293,68 @@ export default {
   },
 
   computed: {
-    // 记录表只支持 group_name / device_ip / fingerprint 精确过滤，设备关键字在这里做本地模糊匹配
+    // 记录表只支持 group_name / device_ip / fingerprint 精确过滤，
+    // 没有传到后端的关键字在这里做本地模糊匹配
+    deviceMatchedRecords() {
+      let data = this.deviceRecords
+
+      if (this.filterForm.group_name) {
+        const keyword = this.filterForm.group_name.toLowerCase()
+        data = data.filter(item => (item.group_name || '').toLowerCase().includes(keyword))
+      }
+
+      if (this.filterForm.device) {
+        const keyword = this.filterForm.device.toLowerCase()
+        data = data.filter(item =>
+          (item.device_ip || '').includes(this.filterForm.device) ||
+          (item.device_name || '').toLowerCase().includes(keyword)
+        )
+      }
+
+      return data
+    },
+
     filteredDeviceRecords() {
-      const data = this.deviceMatchedRecords
       const start = (this.currentPage - 1) * this.pageSize
-      return data.slice(start, start + this.pageSize)
+      return this.deviceMatchedRecords.slice(start, start + this.pageSize)
     },
 
     filteredDeviceTotal() {
       return this.deviceMatchedRecords.length
     },
 
-    deviceMatchedRecords() {
-      if (!this.filterForm.device) return this.deviceRecords
-      const keyword = this.filterForm.device.toLowerCase()
-      return this.deviceRecords.filter(item =>
-        (item.device_ip || '').includes(this.filterForm.device) ||
-        (item.device_name || '').toLowerCase().includes(keyword)
-      )
+    // 指纹视图：名称作用于分组，设备关键字作用于组内主机
+    filteredFingerprintGroups() {
+      let groups = this.fingerprintGroups
+
+      if (this.filterForm.group_name) {
+        const keyword = this.filterForm.group_name.toLowerCase()
+        groups = groups.filter(group => (group.group_name || '').toLowerCase().includes(keyword))
+      }
+
+      if (this.filterForm.device) {
+        const keyword = this.filterForm.device.toLowerCase()
+        groups = groups.map(group => {
+          const hosts = group.hosts.filter(host =>
+            (host.device_ip || '').includes(this.filterForm.device) ||
+            (host.device_name || '').toLowerCase().includes(keyword)
+          )
+          return { ...group, hosts, device_count: hosts.length }
+        }).filter(group => group.hosts.length > 0)
+      }
+
+      return groups
+    }
+  },
+
+  watch: {
+    // 筛选结果变化后重算分页，页码越界时回到第一页
+    filteredFingerprintGroups(val) {
+      const maxPage = Math.max(1, Math.ceil(val.length / this.pageSize))
+      if (this.currentPage > maxPage) {
+        this.currentPage = 1
+      }
+      this.applyPagination()
     }
   },
 
@@ -377,44 +435,19 @@ export default {
         if (res.code === 0) {
           const records = res.data || []
 
-          if (this.groupMode === 'fingerprint') {
-            const fingerprintMap = {}
-            records.forEach(record => {
-              const fp = record.fingerprint || `unknown-${record.device_ip}-${record.group_name}`
-              if (!fingerprintMap[fp]) {
-                fingerprintMap[fp] = {
-                  group_name: record.group_name,
-                  fingerprint: fp,
-                  acl_type: this.inferAclType(record.entries),
-                  entries: this.entryList(record),
-                  hosts: []
-                }
-              }
-              fingerprintMap[fp].hosts.push({
-                device_ip: record.device_ip,
-                device_name: record.device_name,
-                vendor: record.vendor,
-                collected_at: record.collected_at
-              })
-            })
+          this.deviceRecords = records.map(record => ({
+            device_ip: record.device_ip,
+            device_name: record.device_name,
+            vendor: record.vendor,
+            group_name: record.group_name,
+            fingerprint: record.fingerprint,
+            acl_type: this.inferAclType(record.entries),
+            entries: this.entryList(record),
+            collected_at: record.collected_at
+          }))
 
-            this.fingerprintGroups = Object.values(fingerprintMap).map(group => ({
-              ...group,
-              device_count: group.hosts.length,
-              entry_count: group.entries.length
-            }))
-          } else {
-            this.deviceRecords = records.map(record => ({
-              device_ip: record.device_ip,
-              device_name: record.device_name,
-              vendor: record.vendor,
-              group_name: record.group_name,
-              fingerprint: record.fingerprint,
-              acl_type: this.inferAclType(record.entries),
-              entries: this.entryList(record),
-              collected_at: record.collected_at
-            }))
-          }
+          this.buildFingerprintGroups(records)
+          this.applyPagination()
         } else {
           this.$message.error(res.message || '加载数据失败')
         }
@@ -422,6 +455,46 @@ export default {
         console.error('加载数据失败:', error)
         this.$message.error('加载数据失败')
       })
+    },
+
+    // 全量记录聚合为分组，分页在 applyPagination 中按分组维度切片
+    buildFingerprintGroups(records) {
+      const fingerprintMap = {}
+      records.forEach(record => {
+        const fp = record.fingerprint || `unknown-${record.device_ip}-${record.group_name}`
+        if (!fingerprintMap[fp]) {
+          fingerprintMap[fp] = {
+            group_name: record.group_name,
+            fingerprint: fp,
+            acl_type: this.inferAclType(record.entries),
+            entries: this.entryList(record),
+            hosts: []
+          }
+        }
+        fingerprintMap[fp].hosts.push({
+          device_ip: record.device_ip,
+          device_name: record.device_name,
+          vendor: record.vendor,
+          collected_at: record.collected_at
+        })
+      })
+
+      this.fingerprintGroups = Object.values(fingerprintMap).map(group => ({
+        ...group,
+        device_count: group.hosts.length,
+        entry_count: group.entries.length
+      }))
+    },
+
+    applyPagination() {
+      const groups = this.filteredFingerprintGroups
+      this.fingerprintTotal = groups.length
+      const start = (this.currentPage - 1) * this.pageSize
+      const pageGroups = groups.slice(start, start + this.pageSize)
+      if (this.activeFingerprints && !pageGroups.some(g => g.fingerprint === this.activeFingerprints)) {
+        this.activeFingerprints = ''
+      }
+      this.pagedFingerprintGroups = pageGroups
     },
 
     // ==================== 操作方法 ====================
@@ -444,6 +517,7 @@ export default {
 
     handleGroupModeChange() {
       this.currentPage = 1
+      this.applyPagination()
     },
 
     handleViewConfig(group) {
@@ -489,10 +563,12 @@ export default {
     handleSizeChange(val) {
       this.pageSize = val
       this.currentPage = 1
+      this.applyPagination()
     },
 
     handleCurrentChange(val) {
       this.currentPage = val
+      this.applyPagination()
     },
 
     // ==================== 创建标准规则 ====================

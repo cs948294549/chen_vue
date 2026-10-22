@@ -1,0 +1,22 @@
+# 构建缓存/本地产物
+node_modules/
+dist/
+chen_vue/
+
+# Git
+.git/
+.gitignore
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store
+
+# 文档
+*.md
+docs/
+
+# Docker 自身
+docker/
+Dockerfile
+docker-compose.yml

@@ -62,7 +62,7 @@
         </el-collapse-item>
       </el-collapse>
       <div style="margin-top:16px;text-align:right;">
-        <el-pagination background layout="total, prev, pager, next" :total="fingerprintTotal" :page-size="pageSize" :current-page.sync="currentPage" @current-change="loadData"></el-pagination>
+        <el-pagination background layout="total, sizes, prev, pager, next" :total="fingerprintTotal" :page-sizes="[10, 20, 50, 100]" :page-size.sync="pageSize" :current-page.sync="currentPage" @size-change="handleSizeChange" @current-change="handlePageChange"></el-pagination>
       </div>
     </div>
 
@@ -84,7 +84,7 @@
         </el-table-column>
       </el-table>
       <div style="margin-top:16px;text-align:right;">
-        <el-pagination background layout="total, prev, pager, next" :total="flatTotal" :page-size="pageSize" :current-page.sync="currentPage" @current-change="loadData"></el-pagination>
+        <el-pagination background layout="total, sizes, prev, pager, next" :total="flatTotal" :page-sizes="[10, 20, 50, 100]" :page-size.sync="pageSize" :current-page.sync="currentPage" @size-change="handleSizeChange" @current-change="handlePageChange"></el-pagination>
       </div>
     </div>
 
@@ -178,6 +178,7 @@ export default {
     return {
       filterForm: { acl_name: '', device: '', vendor: '', acl_type: '' },
       groupMode: 'fingerprint',
+      allRecords: [],
       fingerprintGroups: [],
       fingerprintTotal: 0,
       flatRecords: [],
@@ -196,12 +197,30 @@ export default {
     loadData() {
       const params = { ...this.filterForm }
       aclApi.getRecordsList(params).then(res => {
-        const list = res.data.data || []
-        this.flatTotal = list.length
-        const start = (this.currentPage - 1) * this.pageSize
-        this.flatRecords = list.slice(start, start + this.pageSize)
-        this.buildFingerprintGroups(list)
+        this.allRecords = res.data.data || []
+        this.applyPagination()
       })
+    },
+    applyPagination() {
+      const start = (this.currentPage - 1) * this.pageSize
+      this.flatTotal = this.allRecords.length
+      this.flatRecords = this.allRecords.slice(start, start + this.pageSize)
+
+      const groups = this.buildFingerprintGroups(this.allRecords)
+      this.fingerprintTotal = groups.length
+      this.fingerprintGroups = groups.slice(start, start + this.pageSize)
+      if (this.fingerprintGroups.length > 0 && !this.fingerprintGroups.some(g => g.fingerprint === this.activeFingerprints)) {
+        this.activeFingerprints = ''
+      }
+    },
+    handlePageChange(page) {
+      this.currentPage = page
+      this.applyPagination()
+    },
+    handleSizeChange(size) {
+      this.pageSize = size
+      this.currentPage = 1
+      this.applyPagination()
     },
     buildFingerprintGroups(list) {
       const map = {}
@@ -212,8 +231,7 @@ export default {
         map[r.fingerprint].records.push(r)
         map[r.fingerprint].device_count++
       })
-      this.fingerprintGroups = Object.values(map)
-      this.fingerprintTotal = this.fingerprintGroups.length
+      return Object.values(map)
     },
     handleGroupModeChange() { this.currentPage = 1; this.loadData() },
     handleSearch() { this.currentPage = 1; this.loadData() },
