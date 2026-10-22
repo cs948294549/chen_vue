@@ -21,7 +21,11 @@ ENV TZ=Asia/Shanghai \
 
 # 先只拷依赖清单, 利用层缓存
 COPY package.json package-lock.json ./
+# --legacy-peer-deps: 项目声明了 css-minimizer-webpack-plugin@3(peer 要求 webpack 5),
+# 但 webpack 实际是 4, 且该插件在 build/ 下从未被 import, 属无害的多余声明.
+# npm 7+ 默认严格检查 peer 依赖会 ERESOLVE, 故关闭检查.
 RUN npm config set registry ${NPM_REGISTRY} \
+    && npm config set legacy-peer-deps true \
     && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund)
 
 # 编译所需源码(只拷必要文件, copy-webpack-plugin 会读 static/)
