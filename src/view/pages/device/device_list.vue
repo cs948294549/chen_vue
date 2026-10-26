@@ -33,6 +33,14 @@
           <el-form-item label="补丁">
             <el-input placeholder="补丁" v-model="filter_feature" @keyup.enter.native="getViews" clearable></el-input>
           </el-form-item>
+          <el-form-item label="配置变更">
+            <el-select placeholder="变更筛选" v-model="filter_changed" style="width: 130px;" @change="getViews" clearable>
+              <el-option label="最近3天变更" value="3"></el-option>
+              <el-option label="最近7天变更" value="7"></el-option>
+              <el-option label="最近30天变更" value="30"></el-option>
+              <el-option label="有变更记录" value="all"></el-option>
+            </el-select>
+          </el-form-item>
           <el-form-item>
             <el-button type="primary" :loading='isload' @click="getViews">筛选</el-button>
           </el-form-item>
@@ -344,6 +352,7 @@
         filter_model:"",
         filter_version:"",
         filter_feature:"",
+        filter_changed:"",
 
         isload: false,
 
@@ -482,25 +491,56 @@
 
         let that = this
         this.isload=true
-        collector_api.getDevs(post_data,{}).then(function(response){
-          if(response.data!="failed"){
-            that.table_info = response.data["data"]
-            that.table_total = that.table_info.length
-            that.table_info_show = that.table_info.slice((that.table_currentPage-1)*that.table_size,that.table_currentPage*that.table_size)
-          }else{
-            that.$message({
-              type: 'error',
-              message: '查询失败，请重试'
-            });
+
+        // 变更筛选条件：空表示不限，all表示曾有变更，数字表示最近N天
+        let changed_param = null
+        if(this.filter_changed!=""){
+          changed_param = {}
+          if(this.filter_changed!="all"){
+            changed_param["days"]=parseInt(this.filter_changed)
           }
+        }
+
+        let dev_request = collector_api.getDevs(post_data,{})
+        let request_list = [dev_request]
+        if(changed_param!=null){
+          request_list.push(config_api.getChangedDevices(changed_param,{}))
+        }
+
+        Promise.all(request_list).then(function(results){
+          let dev_response = results[0]
+          let dev_list = dev_response.data ? dev_response.data["data"] : null
+          if(!Array.isArray(dev_list)){
+            throw new Error("设备列表查询失败")
+          }
+
+          if(changed_param!=null){
+            let changed_response = results[1]
+            if(!changed_response.data || changed_response.data.code !== 0){
+              throw new Error("变更设备列表查询失败")
+            }
+            // 变更接口返回的字段与设备列表一致，这里只借它的IP集合做过滤
+            let changed_ips = {}
+            let changed_data = changed_response.data.data || []
+            for(let i=0;i<changed_data.length;i++){
+              changed_ips[changed_data[i].ip] = changed_data[i]
+            }
+            dev_list = dev_list.filter(function(item){
+              return changed_ips.hasOwnProperty(item.ip)
+            })
+          }
+
+          that.table_info = dev_list
+          that.table_total = that.table_info.length
+          that.table_info_show = that.table_info.slice((that.table_currentPage-1)*that.table_size,that.table_currentPage*that.table_size)
           that.isload=false
         }).catch(function (error) {
-            console.log(error)
-            that.isload=false
-            that.$message({
-              type: 'error',
-              message: '查询失败，请重试'
-            });
+          console.log(error)
+          that.isload=false
+          that.$message({
+            type: 'error',
+            message: '查询失败，请重试'
+          });
         })
       },
 

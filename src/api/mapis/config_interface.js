@@ -33,5 +33,10 @@ export default {
   // 获取工单设备的配置对比
   compareConfigByOrder(data, params) {
     return axios.post("/config/compare_by_order", data, params)
+  },
+
+  // 获取最近发生过配置变更的设备列表
+  getChangedDevices(data, params) {
+    return axios.post("/config/get_changed_devices", data, params)
   }
 }
