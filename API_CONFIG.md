@@ -12,10 +12,10 @@
 ## 配置项说明
 
 ### 1. API_BASE_URL
-后端 API 服务器地址
+后端 API 基础路径。生产环境为 `"/api"`（同源相对路径），由外层 nginx 的 `^~ /api/` 反代到后端；浏览器自动补当前页面的 origin，因此换域名/端口/IP 都不需要重新构建。
 
 ### 2. SOCKET_URL
-WebSocket 服务器地址（不含协议，自动适配 http/https）
+WebSocket 服务器地址，**可选**。不配置时前端默认使用 `window.location.origin`，协议（http/https）、域名、端口全部跟随当前页面。只有 WebSocket 与页面不同源时才需要显式配置。
 
 ### 3. SOCKET_PATH
 WebSocket 连接路径
@@ -35,13 +35,16 @@ MD5 加盐值，**仅在前端使用**，用于客户端数据签名
 ```javascript
 module.exports = merge(prodEnv, {
   NODE_ENV: '"development"',
+  // dev 不走 nginx 反代（config/index.js 的 proxyTable 是注释掉的），
+  // 所以固定为线上地址直连
   API_BASE_URL: '"netops.vdian.net/api"',
-  // SOCKET_URL 和 SOCKET_PATH 继承自 prod.env.js
+  SOCKET_URL: '"netops.vdian.net"',
+  // SOCKET_PATH 继承自 prod.env.js
   // AES_SECRET 和 MD5_SALT 继承自 prod.env.js
 })
 ```
 
-> 注意：开发环境默认继承生产环境的配置，确保配置一致性
+> 注意：开发环境默认继承生产环境的配置；但 `API_BASE_URL` / `SOCKET_URL` 因为是相对路径/空，本地无 nginx 可用，故在 `dev.env.js` 中覆盖为线上地址
 
 ### 生产环境
 
@@ -50,8 +53,7 @@ module.exports = merge(prodEnv, {
 ```javascript
 module.exports = {
   NODE_ENV: '"production"',
-  API_BASE_URL: '"netops.vdian.net/api"',
-  SOCKET_URL: '"netops.vdian.net"',
+  API_BASE_URL: '"/api"',
   SOCKET_PATH: '"/sock/socket.io"',
   AES_SECRET: '"your-aes-secret-key"',
   MD5_SALT: '"your-md5-salt"'
@@ -106,46 +108,33 @@ config/secret.env.example.js
 ## 配置注意事项
 
 1. **字符串需要双引号包裹** - 由于 webpack DefinePlugin 的工作方式，配置值必须是 `'"value"'` 格式（外层单引号，内层双引号）
-2. **修改后需要重启服务** - 配置文件修改后需要重新运行 `npm run dev` 或 `npm run build`
-3. **协议自动适配** - API_BASE_URL 不要包含协议前缀，系统会自动根据当前页面协议选择 http 或 https
+2. **修改后需要重新构建** - 这些值由 DefinePlugin 在编译期文本替换进 bundle，改完必须重新 `npm run build`；运行中的容器/静态文件不受影响
+3. **地址走同源相对路径** - `API_BASE_URL` 为 `/api`、`SOCKET_URL` 留空，浏览器自动补当前页面的 origin，因此部署到任何域名/IP/端口都无需重新构建，前提是反代方有 `/api/` 与 `/sock/` 的 location
 
 ## 完整配置示例
 
-### 本地开发环境
+### 生产环境（推荐，与域名无关）
 ```javascript
 // config/prod.env.js
 module.exports = {
   NODE_ENV: '"production"',
-  API_BASE_URL: '"localhost:5000"',
-  SOCKET_URL: '"localhost"',
+  API_BASE_URL: '"/api"',
   SOCKET_PATH: '"/sock/socket.io"',
-  // 继承 prod.env.js 的加密配置
+  AES_SECRET: '"prod-secret-key-32chars-long"',
+  MD5_SALT: '"prod-salt-value"'
 }
 ```
 
-### 测试环境
+### 前后端不同源时
 ```javascript
-// config/prod.env.js
+// config/prod.env.js —— 只有 WebSocket / API 与页面不同源才这样写
 module.exports = {
   NODE_ENV: '"production"',
-  API_BASE_URL: '"chen.test.com/api"',
+  API_BASE_URL: '"https://chen.test.com/api"',   // 含协议，直接作为绝对地址
   SOCKET_URL: '"chen.test.com"',
   SOCKET_PATH: '"/sock/socket.io"',
   AES_SECRET: '"test-secret-key-32chars-long"',
   MD5_SALT: '"test-salt-value"'
-}
-```
-
-### 生产环境
-```javascript
-// config/prod.env.js
-module.exports = {
-  NODE_ENV: '"production"',
-  API_BASE_URL: '"netops.vdian.net/api"',
-  SOCKET_URL: '"netops.vdian.net"',
-  SOCKET_PATH: '"/sock/socket.io"',
-  AES_SECRET: '"prod-secret-key-32chars-long"',
-  MD5_SALT: '"prod-salt-value"'
 }
 ```
 
@@ -163,9 +152,10 @@ module.exports = {
 
 ## 默认值
 
-如果环境变量未配置，将使用以下默认值（仅用于开发调试）：
-- `API_BASE_URL`: `"localhost:5000"`
-- `SOCKET_URL`: `"netops.vdian.net"`
+如果环境变量未配置，将使用以下默认值（`src/api/axios.js`、`src/main.js` 中的 `||` 兜底）：
+
+- `API_BASE_URL`: `"/api"`（同源相对路径）
+- `SOCKET_URL`: `window.location.origin`（跟随当前页面域名/协议/端口）
 - `SOCKET_PATH`: `"/sock/socket.io"`
 - `AES_SECRET`: `"3a4b3ca0247e0500da70d637f6c5ded8"`
 - `MD5_SALT`: `"eyJhbGciOiJIUzI1NiIsIn"`

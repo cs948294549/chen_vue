@@ -7,12 +7,12 @@
       <div v-show="mcp_tip_show" style="padding: 10px 15px; background: #f4f4f5; border-radius: 4px; line-height: 1.8;">
         在终端执行以下命令接入 MCP，其中 <code>&lt;key&gt;:&lt;secret&gt;</code> 替换为当前用户的访问凭证，<code>&lt;name&gt;</code> 为自定义的服务名：
         <br/>
-        <code>claude mcp add --header "Authorization: Bearer &lt;key&gt;:&lt;secret&gt;" --transport http &lt;name&gt; http://&lt;netops.vdian.net&gt;/api/mcp</code>
+        <code>claude mcp add --header "Authorization: Bearer &lt;key&gt;:&lt;secret&gt;" --transport http &lt;name&gt; http://&lt;domain&gt;/api/mcp</code>
         <br/><br/>
         或者在 MCP 配置文件中直接添加：
         <pre style="margin: 6px 0 0; padding: 10px; background: #fff; border-radius: 4px; line-height: 1.6;">"network_mcp": {
   "type": "http",
-  "url": "http://&lt;netops.vdian.net&gt;/api/mcp",
+  "url": "http://&lt;domain&gt;/api/mcp",
   "headers": {
     "Authorization": "Bearer &lt;key&gt;:&lt;secret&gt;"
   }

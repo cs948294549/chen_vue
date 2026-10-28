@@ -120,7 +120,7 @@ docker stop netops-frontend
 |---|---|---|
 | Node 版本 | 构建阶段固定 **16.20.2** | `build/check-versions.js` 校验 `engines.node`;webpack 4 的 md4 在 OpenSSL 3(Node 18+)上报 `digital envelope routines::unsupported`。镜像与本机开发版本对齐 |
 | 构建架构 | 服务器是 amd64,Mac 是 arm64 | 本地构建需加 `--platform=linux/amd64`,否则服务器上 `exec format error` |
-| 接口地址 | 构建期写死 | `config/prod.env.js` 的 `API_BASE_URL` / `SOCKET_URL` 编译进 bundle,换域名必须重新构建镜像 |
+| 接口地址 | 与域名无关 | `config/prod.env.js` 中 `API_BASE_URL` 为 `/api`（同源相对路径）、`SOCKET_URL` 留空走 `window.location.origin`，DNS/域名/端口/IP 全部跟随当前页面，同一镜像可部署到任意环境。前提是外层 nginx 有 `^~ /api/` 与 `^~ /sock/` 反代 |
 | 入口 CSS | 不可长缓存 | `/static/css/app.app.css` 文件名不含 hash,故 `/static/` 用 30 天而非 `immutable` |
 | 网络 | 需能访问 npm 源 | 构建阶段拉依赖;内网环境可改 `--build-arg NPM_REGISTRY=<内网源>` |
 | 端口 | 只绑 `127.0.0.1` | 外网统一走外层 nginx,容器端口不对外暴露 |

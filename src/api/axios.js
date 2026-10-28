@@ -10,17 +10,9 @@ axios.defaults.timeout = 1000000 // 超时时间
 
 axios.defaults.withCredentials = false
 
-// 从环境变量读取API地址
-const server_port = process.env.API_BASE_URL || "localhost:5000"
-
-const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-
-// console.log("用户【接口】使用协议类型===", protocol, window.location.protocol)
-if(protocol=="http:"){
-  axios.defaults.baseURL = "http://"+server_port
-}else{
-  axios.defaults.baseURL = "https://"+server_port
-}
+// 接口地址走同源相对路径: 浏览器自动补当前页面的 origin, http/https 自适应
+// 反代由外层 nginx 的 ^~ /api/ 承担, 换域名/端口无需重新构建
+axios.defaults.baseURL = process.env.API_BASE_URL || "/api"
 
 const header_sign = ()=>{
   const secret = Cookies.get("token_sign")

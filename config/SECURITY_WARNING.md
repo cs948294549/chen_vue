@@ -39,7 +39,8 @@ node -e "console.log(require('crypto').randomBytes(12).toString('base64'))"
 // config/prod.env.js
 module.exports = {
   NODE_ENV: '"production"',
-  API_BASE_URL: '"netops.vdian.net/api"',
+  API_BASE_URL: '"/api"',
+  SOCKET_PATH: '"/sock/socket.io"',
   AES_SECRET: '"[生成的AES密钥]"',      // ⚠️ 务必修改
   MD5_SALT: '"[生成的MD5盐值]"'        // ⚠️ 务必修改
 }

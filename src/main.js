@@ -15,15 +15,15 @@ import VueSocketIO from 'vue-socket.io'
 import SocketIO from "socket.io-client";
 
 // 从环境变量读取 WebSocket 配置
-const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-const socketUrl = process.env.SOCKET_URL || "netops.vdian.net"
+// socketUrl 默认取当前页面的 origin, 域名/端口/协议自动跟随
+const socketUrl = process.env.SOCKET_URL || window.location.origin
 const socketPath = process.env.SOCKET_PATH || "/sock/socket.io"
 
-console.log("WebSocket连接地址===", `${protocol}//${socketUrl}`, "路径===", socketPath)
+console.log("WebSocket连接地址===", socketUrl, "路径===", socketPath)
 
 Vue.use(new VueSocketIO({
   debug: true,
-  connection: SocketIO(`${protocol}//${socketUrl}`, {path: socketPath}),
+  connection: SocketIO(socketUrl, {path: socketPath}),
 }));
 
 
