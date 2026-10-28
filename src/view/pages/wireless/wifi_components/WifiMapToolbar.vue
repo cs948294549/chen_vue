@@ -86,7 +86,7 @@ export default {
       ids: [],
       filter: 'all',
       searchValue: '',
-      autoRefresh: 60,
+      autoRefresh: 0,   // 默认关闭：不再定时拉取，只在手动点「刷新」时重取
       now: Date.now()
     }
   },
