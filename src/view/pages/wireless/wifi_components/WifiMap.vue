@@ -68,6 +68,8 @@ const MIN_ZOOM = 0.2
 const MAX_ZOOM = 5
 const LABEL_DETAIL_ZOOM = 1.2
 const LABEL_BASIC_ZOOM = 0.6
+// 图标整体缩放：pin 与标签同一比例，只改这一个值就能整体调大调小
+const ICON_SCALE = 0.85
 
 export default {
   name: 'WifiMap',
@@ -118,9 +120,10 @@ export default {
       return 0
     },
 
-    // 舞台放大了 zoom 倍，内层反向缩小，图标在屏幕上保持原大小
+    // 舞台放大了 zoom 倍，内层反向缩小，图标在屏幕上保持恒定大小
+    // 再乘一个固定比例，整体控制 pin 和标签的视觉尺寸
     iconScale() {
-      return 1 / this.zoom
+      return ICON_SCALE / this.zoom
     }
   },
 

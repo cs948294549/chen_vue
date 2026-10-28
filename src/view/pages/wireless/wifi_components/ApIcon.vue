@@ -21,21 +21,19 @@
         <span class="ap-icon__count is-off" v-else>离线</span>
       </template>
     </div>
-    <!-- 全量标签：名称 + 各射频利用率/功率/终端数 -->
-    <!-- 刚拖入的 AP 还没有射频快照，只显示名称，避免出现一堆 0射频/--dBm -->
+    <!-- 全量标签：名称 + 各射频标签（射频/利用率/信道/功率/终端数，单行展示） -->
+    <!-- 刚拖入的 AP 还没有射频快照，只显示名称，避免出现一堆 --dBm/0人 -->
     <div v-else-if="labelLevel === 2" class="ap-icon__label is-full">
       <span class="ap-icon__name">{{ title }}</span>
-      <!-- 利用率按射频分开：一个射频一个标签，颜色随信道利用率变化，功率与人数挂在同一标签内 -->
+      <!-- 利用率按射频分开：一个射频一个标签，颜色随信道利用率变化 -->
+      <!-- 信息只往横向铺，不换行不加高：射频数多时靠 flex-wrap 另起一排标签 -->
       <span class="ap-icon__radios" v-if="isOnline && radioChips.length">
         <em
           v-for="r in radioChips"
           :key="r.key"
           class="ap-icon__radio"
           :class="'is-' + r.level"
-          :title="r.tip">
-          <span class="ap-icon__radio-main">{{ r.main }}</span>
-          <span class="ap-icon__radio-sub" v-if="r.sub">{{ r.sub }}</span>
-        </em>
+          :title="r.tip">{{ r.text }}</em>
       </span>
     </div>
   </div>
@@ -111,19 +109,19 @@ export default {
       return this.isOnline && this.utilLevel === 'bad'
     },
 
-    // 每个射频一个标签：R+射频ID / 信道 / 利用率%，第二行挂功率和终端数
-    // 不写频段：信道号本身就能区分 2.4G / 5G
+    // 每个射频一个单行标签：R0 62% CH149 · 20dBm · 8人
+    // 只往横向铺，不换行不加高；不写频段，信道号本身就能区分 2.4G / 5G
     radioChips() {
       const list = this.marker.radios || []
       if (!list.length) {
         // 后端未返回射频明细时，退回 AP 汇总的单值（max 利用率 + 汇总终端数）
         if (typeof this.marker.utilization !== 'number') return []
+        const extra = this.subText('', this.marker.tx_power, this.marker.client_count)
         return [{
           key: 'sum',
-          main: '利用率 ' + this.marker.utilization + '%',
-          sub: this.subText(this.marker.tx_power, this.marker.client_count),
+          text: ['利用率 ' + this.marker.utilization + '%', extra].filter(Boolean).join(' '),
           level: this.utilLevelOf(this.marker.utilization),
-          tip: '信道利用率 ' + this.marker.utilization + '%'
+          tip: '信道利用率 ' + this.marker.utilization + '%' + (extra ? '\n' + extra : '')
         }]
       }
       return list.map((r, i) => {
@@ -131,15 +129,14 @@ export default {
         const ch = r.channel ? 'CH' + r.channel : ''
         const hasUtil = typeof r.utilization === 'number'
         const util = hasUtil ? r.utilization + '%' : '--'
-        const sub = this.subText(r.tx_power, r.client_count)
+        const extra = this.subText(ch, r.tx_power, r.client_count)
         return {
           key: 'r' + id,
-          main: [id, ch, util].filter(Boolean).join(' '),
-          sub,
+          text: [id, util, extra].filter(Boolean).join(' '),
           level: this.utilLevelOf(r.utilization),
           tip: [
             `${id}${ch ? ' · ' + ch : ''} 信道利用率 ${hasUtil ? r.utilization + '%' : '--'}`,
-            sub
+            extra
           ].filter(Boolean).join('\n')
         }
       })
@@ -153,9 +150,10 @@ export default {
       return 'R' + radioId
     },
 
-    // 标签第二行：功率 · 终端数
-    subText(power, clients) {
+    // 标签尾部附加信息：信道 · 功率 · 终端数，任一为空就跳过
+    subText(channel, power, clients) {
       const parts = []
+      if (channel) parts.push(channel)
       if (power !== null && power !== undefined && power !== '') parts.push(power + 'dBm')
       if (clients !== null && clients !== undefined && clients !== '') parts.push(clients + '人')
       return parts.join(' · ')
@@ -302,40 +300,26 @@ export default {
 }
 
 /* 按射频分标签：颜色跟着该射频的信道利用率走，与圆环同一套阈值 */
+/* 单个标签始终单行不折行；射频多了就整块换行，每个标签高度不变 */
 .ap-icon__radios {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 4px;
-  max-width: 190px;
+  gap: 3px 4px;
+  max-width: 260px;
 }
 
-/* 每个射频一个双行标签：首行 射频/信道/利用率，次行 功率 · 终端数 */
+/* 每个射频一个单行标签：R0 62% CH149 · 20dBm · 8人 */
 .ap-icon__radio {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: inline-flex;
+  align-items: baseline;
   font-style: normal;
   font-size: 11px;
   line-height: 14px;
-  padding: 1px 6px;
+  padding: 0 6px;
   border-radius: 8px;
   white-space: nowrap;
   border: 1px solid transparent;
-}
-
-.ap-icon__radio-main {
-  font-weight: 600;
-}
-
-.ap-icon__radio-sub {
-  font-size: 10px;
-  opacity: 0.85;
-}
-
-/* 次行的分隔点比主行更淡，避免抢视线 */
-.ap-icon__radio-sub:empty {
-  display: none;
 }
 
 .ap-icon__radio.is-ok {
