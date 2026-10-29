@@ -30,6 +30,11 @@ export default {
     return axios.post("/config/delete", data, params)
   },
 
+  // 手动备份设备配置
+  backupConfig(data, params) {
+    return axios.post("/config/backup", data, params)
+  },
+
   // 获取工单设备的配置对比
   compareConfigByOrder(data, params) {
     return axios.post("/config/compare_by_order", data, params)

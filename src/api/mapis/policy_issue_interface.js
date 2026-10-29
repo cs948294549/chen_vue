@@ -38,5 +38,10 @@ export default {
   // 创建新的问题处理记录（手动创建）
   createNewIssue(data, params) {
     return axios.post("/policy/issues/new_issue", data, params)
+  },
+
+  // 基于设备最新备份配置重新解析（object_type + device_ip）
+  recollectDevice(data, params) {
+    return axios.post("/policy/issues/recollect", data, params)
   }
 }

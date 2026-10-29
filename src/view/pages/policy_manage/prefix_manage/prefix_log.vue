@@ -111,7 +111,7 @@
               </template>
             </el-table-column>
 
-            <el-table-column label="操作" width="150" align="center">
+            <el-table-column label="操作" width="200" align="center">
               <template slot-scope="scope">
                 <el-button
                   size="mini"
@@ -119,6 +119,14 @@
                   icon="el-icon-view"
                   @click="handleViewDeviceConfig(scope.row, group)">
                   查看详情
+                </el-button>
+                <el-button
+                  size="mini"
+                  type="text"
+                  icon="el-icon-refresh"
+                  :loading="!!recollectLoading[scope.row.device_ip]"
+                  @click="handleRecollect(scope.row)">
+                  重新解析
                 </el-button>
               </template>
             </el-table-column>
@@ -191,7 +199,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="150" fixed="right" align="center">
+        <el-table-column label="操作" width="200" fixed="right" align="center">
           <template slot-scope="scope">
             <el-button
               size="mini"
@@ -199,6 +207,14 @@
               icon="el-icon-view"
               @click="handleViewDeviceConfigFromList(scope.row)">
               查看详情
+            </el-button>
+            <el-button
+              size="mini"
+              type="text"
+              icon="el-icon-refresh"
+              :loading="!!recollectLoading[scope.row.device_ip]"
+              @click="handleRecollect(scope.row)">
+              重新解析
             </el-button>
           </template>
         </el-table-column>
@@ -326,6 +342,7 @@
 
 <script>
 import prefixListApi from '@/api/mapis/prefix_list_interface'
+import policyIssueApi from '@/api/mapis/policy_issue_interface'
 
 export default {
   name: 'PrefixListRecords',
@@ -355,7 +372,10 @@ export default {
 
       // 配置详情对话框
       configDialogVisible: false,
-      currentConfig: null
+      currentConfig: null,
+
+      // 重新解析中的设备，key 为设备IP
+      recollectLoading: {}
     }
   },
 
@@ -607,6 +627,26 @@ export default {
         collected_at: row.collected_at
       }
       this.configDialogVisible = true
+    },
+
+    // 基于设备最新备份配置重新解析，完成后刷新列表
+    handleRecollect(row) {
+      const ip = row.device_ip
+      this.$set(this.recollectLoading, ip, true)
+      policyIssueApi.recollectDevice({ object_type: 'prefix_list', device_ip: ip }).then(response => {
+        const res = response.data
+        this.$set(this.recollectLoading, ip, false)
+        if (res.code === 0) {
+          this.$message.success(`${row.device_name || ip} 重新解析完成：${res.message}`)
+          this.loadData()
+        } else {
+          this.$message.error(res.message || '重新解析失败')
+        }
+      }).catch(error => {
+        console.error('重新解析失败:', error)
+        this.$set(this.recollectLoading, ip, false)
+        this.$message.error('重新解析失败')
+      })
     },
 
     // ==================== 工具方法 ====================

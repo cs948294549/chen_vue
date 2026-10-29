@@ -14,6 +14,12 @@
           <el-form-item label="搜索">
             <el-input placeholder="IP地址或设备名称" v-model="filter_search" @keyup.enter.native="getIpList" clearable></el-input>
           </el-form-item>
+          <el-form-item label="管理状态">
+            <el-select placeholder="全部" v-model="filter_admin_status" style="width: 100px;" @change="getIpList" clearable>
+              <el-option label="正常" value="0"></el-option>
+              <el-option label="屏蔽" value="1"></el-option>
+            </el-select>
+          </el-form-item>
           <el-form-item>
             <el-button type="primary" :loading='isload' @click="getIpList">查询</el-button>
           </el-form-item>
@@ -119,6 +125,7 @@ export default {
 
       // 筛选用
       filter_search: "",
+      filter_admin_status: "",
 
       isload: false,
 
@@ -192,6 +199,10 @@ export default {
       this.filter_search = this.filter_search.replace(/^\s*|\s*$/g, "")
       if (this.filter_search != "") {
         post_data["search"] = this.filter_search
+      }
+      // 管理状态：空表示不限，0=正常，1=屏蔽
+      if (this.filter_admin_status !== "") {
+        post_data["admin_status"] = this.filter_admin_status
       }
 
       this.table_currentPage = 1

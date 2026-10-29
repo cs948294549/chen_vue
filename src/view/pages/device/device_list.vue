@@ -66,9 +66,10 @@
       </el-table-column>
       <el-table-column prop='timestamp' label='采集时间' show-overflow-tooltip min-width='20' align='center'>
       </el-table-column>
-      <el-table-column label='操作' min-width='12' align='center' fixed="right">
+      <el-table-column label='操作' min-width='20' align='center' fixed="right">
         <template slot-scope="scope">
           <el-button size="mini" type="primary" @click="handleViewConfig(scope.row)">查看配置</el-button>
+          <el-button size="mini" type="success" :loading="!!backup_loading[scope.row.ip]" @click="handleBackupConfig(scope.row)">备份</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -356,6 +357,9 @@
 
         isload: false,
 
+        // 手动备份中的设备，key 为设备IP
+        backup_loading: {},
+
         // 配置查看抽屉相关
         drawer_visible: false,
         current_device: {},
@@ -541,6 +545,48 @@
             type: 'error',
             message: '查询失败，请重试'
           });
+        })
+      },
+
+      // ==================== 配置备份相关 ====================
+      handleBackupConfig(row) {
+        // 手动备份设备配置：后端登录设备采集当前配置，与最新备份对比后保存
+        this.$confirm(`确认立即备份设备 ${row.sysname} (${row.ip}) 的配置吗？`, '备份确认', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'info'
+        }).then(() => {
+          let that = this
+          this.$set(this.backup_loading, row.ip, true)
+          config_api.backupConfig({
+            ip: row.ip
+          }, {}).then(function(response) {
+            if (response.data && response.data.code === 0) {
+              that.$message({
+                type: 'success',
+                message: `${row.sysname} 备份成功：${response.data.message}`
+              })
+              // 如果正在查看该设备的配置历史，刷新列表
+              if (that.drawer_visible && that.current_device.ip === row.ip) {
+                that.loadConfigList()
+              }
+            } else {
+              that.$message({
+                type: 'error',
+                message: `${row.sysname} 备份失败：${(response.data && response.data.message) || '未知错误'}`
+              })
+            }
+            that.$set(that.backup_loading, row.ip, false)
+          }).catch(function(error) {
+            console.log(error)
+            that.$set(that.backup_loading, row.ip, false)
+            that.$message({
+              type: 'error',
+              message: `${row.sysname} 备份失败`
+            })
+          })
+        }).catch(() => {
+          // 用户取消备份
         })
       },
 

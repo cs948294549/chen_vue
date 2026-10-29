@@ -57,7 +57,12 @@
             <el-table-column prop="device_name" label="设备名称" min-width="180" show-overflow-tooltip />
             <el-table-column prop="vendor" label="厂商" width="120" align="center"><template slot-scope="scope"><el-tag type="info" size="mini" effect="plain">{{ scope.row.vendor }}</el-tag></template></el-table-column>
             <el-table-column prop="collected_at" label="采集时间" width="160" align="center"><template slot-scope="scope">{{ formatTime(scope.row.collected_at) }}</template></el-table-column>
-            <el-table-column label="操作" width="100" align="center"><template slot-scope="scope"><el-button type="text" size="mini" @click="handleViewDetail(scope.row)">查看详情</el-button></template></el-table-column>
+            <el-table-column label="操作" width="160" align="center">
+              <template slot-scope="scope">
+                <el-button type="text" size="mini" @click="handleViewDetail(scope.row)">查看详情</el-button>
+                <el-button type="text" size="mini" :loading="!!recollectLoading[scope.row.device_ip]" @click="handleRecollect(scope.row)">重新解析</el-button>
+              </template>
+            </el-table-column>
           </el-table>
         </el-collapse-item>
       </el-collapse>
@@ -76,10 +81,11 @@
         <el-table-column prop="rule_count" label="条目数" width="80" align="center" />
         <el-table-column prop="fingerprint" label="指纹(前16位)" width="160"><template slot-scope="scope"><span class="fingerprint-text">{{ scope.row.fingerprint.substring(0,16) }}</span></template></el-table-column>
         <el-table-column prop="collected_at" label="采集时间" width="160" align="center"><template slot-scope="scope">{{ formatTime(scope.row.collected_at) }}</template></el-table-column>
-        <el-table-column label="操作" width="160" align="center" fixed="right">
+        <el-table-column label="操作" width="220" align="center" fixed="right">
           <template slot-scope="scope">
             <el-button type="text" size="mini" @click="handleViewDetail(scope.row)">查看详情</el-button>
             <el-button type="text" size="mini" @click="handleViewDeviceConfig(scope.row)">查看配置</el-button>
+            <el-button type="text" size="mini" :loading="!!recollectLoading[scope.row.device_ip]" @click="handleRecollect(scope.row)">重新解析</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -171,6 +177,7 @@
 
 <script>
 import aclApi from '@/api/mapis/acl_interface'
+import policyIssueApi from '@/api/mapis/policy_issue_interface'
 
 export default {
   name: 'AclLog',
@@ -187,7 +194,9 @@ export default {
       pageSize: 20,
       activeFingerprints: '',
       detailDialog: { visible: false, record: null },
-      configDialog: { visible: false, config: null }
+      configDialog: { visible: false, config: null },
+      // 重新解析中的设备，key 为设备IP
+      recollectLoading: {}
     }
   },
   created() {
@@ -280,6 +289,26 @@ export default {
     },
 
     handleViewDetail(row) { this.detailDialog.record = row; this.detailDialog.visible = true },
+
+    // 基于设备最新备份配置重新解析，完成后刷新列表
+    handleRecollect(row) {
+      const ip = row.device_ip
+      this.$set(this.recollectLoading, ip, true)
+      policyIssueApi.recollectDevice({ object_type: 'acl', device_ip: ip }).then(response => {
+        const res = response.data
+        this.$set(this.recollectLoading, ip, false)
+        if (res.code === 0) {
+          this.$message.success(`${row.device_name || ip} 重新解析完成：${res.message}`)
+          this.loadData()
+        } else {
+          this.$message.error(res.message || '重新解析失败')
+        }
+      }).catch(error => {
+        console.error('重新解析失败:', error)
+        this.$set(this.recollectLoading, ip, false)
+        this.$message.error('重新解析失败')
+      })
+    },
     formatTime(ts) {
       if (!ts) return '-'
       const d = new Date(Number(ts) * 1000)
