@@ -474,9 +474,11 @@ export default {
     // ==================== 工具方法 ====================
 
     // 条目在列表接口里是裸数组，详情/编辑沿用同一形态
+    // 按 seq 升序返回：指纹由后端按 seq 计算，展示顺序需与之一致
     entryList(row) {
       if (!row || !row.entries) return []
-      return Array.isArray(row.entries) ? row.entries : (row.entries.entries || [])
+      const list = Array.isArray(row.entries) ? row.entries : (row.entries.entries || [])
+      return list.slice().sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0))
     },
 
     matchStatusText(status) {

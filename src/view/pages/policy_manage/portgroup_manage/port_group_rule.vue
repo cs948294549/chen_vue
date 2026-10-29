@@ -485,9 +485,11 @@ export default {
     // ==================== 工具方法 ====================
 
     // 条目在标准表里是裸数组，详情接口沿用同一形态
+    // 按 seq 升序返回：指纹由后端按 seq 计算，展示顺序需与之一致
     entryList(row) {
       if (!row || !row.entries) return []
-      return Array.isArray(row.entries) ? row.entries : (row.entries.entries || [])
+      const list = Array.isArray(row.entries) ? row.entries : (row.entries.entries || [])
+      return list.slice().sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0))
     },
 
     // 端口值可能是 int（数字端口）或 string（服务名别名）

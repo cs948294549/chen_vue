@@ -624,6 +624,10 @@ export default {
       if (copied.entries && copied.entries.entries) {
         copied.entries = copied.entries.entries
       }
+      // 按 seq 升序展示，与提交顺序保持一致
+      if (Array.isArray(copied.entries)) {
+        copied.entries.sort((a, b) => Number(a.seq) - Number(b.seq))
+      }
       this.ruleForm = copied
       this.dialogVisible = true
     },
@@ -634,6 +638,10 @@ export default {
       // 确保 entries 是数组格式
       if (copied.entries && copied.entries.entries) {
         copied.entries = copied.entries.entries
+      }
+      // 按 seq 升序展示，与提交顺序保持一致
+      if (Array.isArray(copied.entries)) {
+        copied.entries.sort((a, b) => Number(a.seq) - Number(b.seq))
       }
       this.ruleForm = copied
       this.dialogVisible = true
@@ -866,6 +874,9 @@ export default {
             this.$message.warning('请至少添加一条配置条目')
             return
           }
+
+          // 按 seq 升序排列，保证提交顺序与设备配置顺序一致，否则指纹会对不上
+          this.ruleForm.entries.sort((a, b) => Number(a.seq) - Number(b.seq))
 
           // 调用后端API保存
           const apiCall = this.dialogMode === 'create'
