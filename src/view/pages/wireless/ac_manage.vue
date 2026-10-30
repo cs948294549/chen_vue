@@ -94,7 +94,8 @@ import wifiApi from '@/api/mapis/wifi_interface'
 const VENDORS = [
   { value: 'huawei', label: '华为' },
   { value: 'h3c', label: '华三' },
-  { value: 'ruijie', label: '锐捷' }
+  { value: 'ruijie', label: '锐捷' },
+  { value: 'fortinet', label: '飞塔' }
 ]
 
 const STATUS = {
