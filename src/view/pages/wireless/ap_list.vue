@@ -1,87 +1,144 @@
 <template>
-  <div>
-    <div v-if="table_info.length>0" style="margin-bottom: 10px;">
-      <el-button type="primary" size="mini" @click="download_table">下载</el-button>
-      <span style="margin-left: 15px; font-size: 12px; color: #606266;">
-        AP 总数 {{ summary.total }}，
-        <span style="color: #67c23a;">在线 {{ summary.online }}</span>，
-        <span style="color: #f56c6c;">离线 {{ summary.offline }}</span>
-        <span v-if="summary.unknown">，未知 {{ summary.unknown }}</span>，
-        终端 {{ summary.clients }}
-      </span>
+  <div class="wl-page">
+    <!-- 标题栏 -->
+    <div class="wl-header">
+      <div class="wl-title">
+        <i class="el-icon-connection"></i>AP 列表
+        <span class="wl-count">{{ filtered.length === table_info.length ? table_info.length : filtered.length + ' / ' + table_info.length }}</span>
+        <span class="wl-subtitle">各 AC 采集的无线接入点，点击 AP 名称查看射频与终端详情</span>
+      </div>
+      <div>
+        <el-button size="small" icon="el-icon-refresh" :loading="isload" @click="getViews">刷新</el-button>
+        <el-button size="small" icon="el-icon-download" :disabled="filtered.length === 0" @click="download_table">导出</el-button>
+      </div>
     </div>
-    <el-row>
-      <el-form style="text-align: right; margin-right: 5px;" size="mini" :inline="true">
-        <el-form-item label="AP名称">
-          <el-input placeholder="AP名称" v-model="filter_ap_name" @keyup.enter.native="getViews" clearable></el-input>
-        </el-form-item>
-        <el-form-item label="MAC">
-          <el-input placeholder="MAC" v-model="filter_ap_mac" @keyup.enter.native="getViews" clearable></el-input>
-        </el-form-item>
-        <el-form-item label="IP">
-          <el-input placeholder="IP" v-model="filter_ap_ip" @keyup.enter.native="getViews" clearable></el-input>
-        </el-form-item>
-        <el-form-item label="SN">
-          <el-input placeholder="SN" v-model="filter_sn" @keyup.enter.native="getViews" clearable></el-input>
-        </el-form-item>
-      </el-form>
-    </el-row>
-    <el-row>
-      <el-form style="text-align: right; margin-right: 5px;" size="mini" :inline="true">
-        <el-form-item label="型号">
-          <el-input placeholder="型号" v-model="filter_model" @keyup.enter.native="getViews" clearable></el-input>
-        </el-form-item>
-        <el-form-item label="分组">
-          <el-input placeholder="分组" v-model="filter_ap_group" @keyup.enter.native="getViews" clearable></el-input>
-        </el-form-item>
-        <el-form-item label="版本">
-          <el-input placeholder="软件版本" v-model="filter_sw_version" @keyup.enter.native="getViews" clearable></el-input>
-        </el-form-item>
-        <el-form-item label="AC">
-          <el-select v-model="filter_ac_id" placeholder="全部" @change="getViews" clearable>
-            <el-option v-for="ac in ac_list" :key="ac.ac_id" :label="ac.ac_name" :value="ac.ac_id"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="filter_online_status" placeholder="全部" @change="getViews" clearable style="width: 100px;">
-            <el-option label="在线" value="online"></el-option>
-            <el-option label="离线" value="offline"></el-option>
-            <el-option label="未知" value="unknown"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading='isload' @click="getViews">筛选</el-button>
-        </el-form-item>
-      </el-form>
-    </el-row>
-    <el-table border :data.sync='table_info_show' size="mini" v-loading="isload">
-      <el-table-column prop="ap_name" label="AP名称" show-overflow-tooltip min-width='20' align='center'></el-table-column>
-      <el-table-column prop="online_status" label="状态" min-width='8' align='center'>
+
+    <!-- 统计卡片：状态卡片可点击筛选 -->
+    <div class="wl-stats">
+      <div
+        v-for="c in statCards"
+        :key="c.key"
+        :class="['stat-card', 'stat-' + c.type, { clickable: c.filter, active: c.filter && filter_online_status === c.status }]"
+        @click="c.filter && setStatus(c.status)">
+        <div class="stat-icon"><i :class="c.icon"></i></div>
+        <div class="stat-body">
+          <div class="stat-value">{{ c.value }}<small v-if="c.unit">{{ c.unit }}</small></div>
+          <div class="stat-label">{{ c.label }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="wl-filter">
+      <div class="filter-row">
+        <el-input v-model="filter_ap_name" size="small" class="f-input" prefix-icon="el-icon-search" placeholder="AP 名称" clearable @keyup.enter.native="getViews"></el-input>
+        <el-input v-model="filter_ap_mac" size="small" class="f-input mono-input" placeholder="MAC" clearable @keyup.enter.native="getViews"></el-input>
+        <el-input v-model="filter_ap_ip" size="small" class="f-input mono-input" placeholder="IP" clearable @keyup.enter.native="getViews"></el-input>
+        <el-select v-model="filter_ac_id" size="small" class="f-input" placeholder="全部 AC" clearable @change="getViews">
+          <el-option v-for="ac in ac_list" :key="ac.ac_id" :label="ac.ac_name" :value="ac.ac_id"></el-option>
+        </el-select>
+        <el-button size="small" type="primary" icon="el-icon-search" :loading="isload" @click="getViews">查询</el-button>
+        <el-button size="small" icon="el-icon-refresh-left" @click="resetFilter">重置</el-button>
+        <el-button size="small" type="text" class="more-btn" @click="showMore = !showMore">
+          更多条件<span v-if="!showMore && moreCount" class="more-badge">{{ moreCount }}</span>
+          <i :class="showMore ? 'el-icon-arrow-up' : 'el-icon-arrow-down'"></i>
+        </el-button>
+      </div>
+      <div v-show="showMore" class="filter-row filter-more">
+        <el-input v-model="filter_sn" size="small" class="f-input mono-input" placeholder="SN" clearable @keyup.enter.native="getViews"></el-input>
+        <el-input v-model="filter_model" size="small" class="f-input" placeholder="型号" clearable @keyup.enter.native="getViews"></el-input>
+        <el-input v-model="filter_ap_group" size="small" class="f-input" placeholder="分组" clearable @keyup.enter.native="getViews"></el-input>
+        <el-input v-model="filter_sw_version" size="small" class="f-input" placeholder="软件版本" clearable @keyup.enter.native="getViews"></el-input>
+      </div>
+    </div>
+
+    <!-- AP 表格 -->
+    <el-table
+      :data="pageRows"
+      v-loading="isload"
+      row-key="ap_mac"
+      size="small"
+      stripe
+      class="wl-table"
+      @sort-change="onSort">
+      <template slot="empty">
+        <el-empty :image-size="80" :description="table_info.length ? '没有符合筛选条件的 AP' : '暂无 AP 数据'"></el-empty>
+      </template>
+      <el-table-column prop="ap_name" label="AP 名称" min-width="190" sortable="custom" show-overflow-tooltip>
         <template slot-scope="scope">
-          <el-tag size="mini" :type="statusTagType(scope.row.online_status)">{{ statusText(scope.row.online_status) }}</el-tag>
+          <span class="ap-link" @click="openDetail(scope.row)">{{ scope.row.ap_name || scope.row.ap_mac }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="ap_mac" label="MAC" show-overflow-tooltip min-width='15' align='center'></el-table-column>
-      <el-table-column prop="ap_ip" label="IP" show-overflow-tooltip min-width='13' align='center'></el-table-column>
-      <el-table-column prop="model" label="型号" show-overflow-tooltip min-width='13' align='center'></el-table-column>
-      <el-table-column prop="ap_group" label="分组" show-overflow-tooltip min-width='13' align='center'></el-table-column>
-      <el-table-column prop="client_count" label="终端数" min-width='8' align='center'></el-table-column>
-      <el-table-column prop="ac_name" label="所属AC" show-overflow-tooltip min-width='12' align='center'></el-table-column>
-      <el-table-column prop="lldp_name" label="上联设备" show-overflow-tooltip min-width='18' align='center'></el-table-column>
-      <el-table-column prop="lldp_port" label="上联端口" show-overflow-tooltip min-width='13' align='center'></el-table-column>
-      <el-table-column prop="sn" label="SN" show-overflow-tooltip min-width='15' align='center'></el-table-column>
-      <el-table-column prop="sw_version" label="软件版本" show-overflow-tooltip min-width='15' align='center'></el-table-column>
-      <el-table-column prop="last_seen_at" label="采集时间" show-overflow-tooltip min-width='15' align='center'></el-table-column>
-      <el-table-column label="操作" min-width='8' align='center' fixed="right">
+      <el-table-column prop="online_status" label="状态" width="80">
         <template slot-scope="scope">
-          <el-button type="text" size="mini" @click="openDetail(scope.row)">详情</el-button>
+          <span :class="['status-dot', 'dot-' + statusTagType(scope.row.online_status)]">{{ statusText(scope.row.online_status) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="ap_mac" label="MAC" min-width="150">
+        <template slot-scope="scope">
+          <span class="mono">{{ scope.row.ap_mac }}</span>
+          <i class="el-icon-document-copy copy-btn" title="复制" @click="copyText(scope.row.ap_mac)"></i>
+        </template>
+      </el-table-column>
+      <el-table-column prop="ap_ip" label="IP" min-width="130" sortable="custom">
+        <template slot-scope="scope">
+          <span v-if="scope.row.ap_ip" class="mono">{{ scope.row.ap_ip }}</span>
+          <span v-else class="empty-text">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="model" label="型号" min-width="120" sortable="custom" show-overflow-tooltip></el-table-column>
+      <el-table-column prop="ap_group" label="分组" min-width="120" sortable="custom" show-overflow-tooltip>
+        <template slot-scope="scope">
+          <span v-if="scope.row.ap_group" class="chip">{{ scope.row.ap_group }}</span>
+          <span v-else class="empty-text">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="client_count" label="终端" width="80" align="center" sortable="custom">
+        <template slot-scope="scope">
+          <span :class="['client-num', { zero: !Number(scope.row.client_count) }]">{{ scope.row.client_count || 0 }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="ac_name" label="所属 AC" min-width="110" show-overflow-tooltip></el-table-column>
+      <el-table-column label="上联" min-width="190">
+        <template slot-scope="scope">
+          <div v-if="scope.row.lldp_name || scope.row.lldp_port" class="two-line">
+            <span class="ellipsis" :title="scope.row.lldp_name">{{ scope.row.lldp_name || '-' }}</span>
+            <span class="mono sub" :title="scope.row.lldp_port">{{ scope.row.lldp_port || '-' }}</span>
+          </div>
+          <span v-else class="empty-text">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="sn" label="SN" min-width="150" show-overflow-tooltip>
+        <template slot-scope="scope">
+          <span v-if="scope.row.sn" class="mono">{{ scope.row.sn }}</span>
+          <span v-else class="empty-text">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="sw_version" label="软件版本" min-width="130" sortable="custom" show-overflow-tooltip></el-table-column>
+      <el-table-column prop="last_seen_at" label="采集时间" width="160" sortable="custom">
+        <template slot-scope="scope">
+          <span class="sub-text">{{ scope.row.last_seen_at || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="80" align="center" fixed="right">
+        <template slot-scope="scope">
+          <el-button type="text" size="mini" icon="el-icon-view" @click="openDetail(scope.row)">详情</el-button>
         </template>
       </el-table-column>
     </el-table>
-    <el-pagination @current-change='handleCurrentChange' :current-page='table_currentPage' @size-change="handleSizeChange"
-      :page-sizes="[2, 20, 50, 100, 200, 500]" :page-size="table_size" layout='total, sizes, prev, pager, next'
-      :total='table_total' style='float: right'>
-    </el-pagination><br/>
+
+    <div class="wl-pager">
+      <el-pagination
+        background
+        @current-change="handleCurrentChange"
+        @size-change="handleSizeChange"
+        :current-page="table_currentPage"
+        :page-sizes="[20, 50, 100, 200, 500]"
+        :page-size="table_size"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="filtered.length">
+      </el-pagination>
+    </div>
 
     <ApDetailDrawer :visible.sync="drawerVisible" :ap-mac="selectedMac" />
   </div>
@@ -92,16 +149,18 @@
   import wifiApi from '@/api/mapis/wifi_interface'
   import ApDetailDrawer from './wifi_components/ApDetailDrawer.vue'
 
+  const EMPTY_SUMMARY = { total: 0, online: 0, offline: 0, unknown: 0, clients: 0 }
+
   export default {
     components: { ApDetailDrawer },
     data () {
       return {
         table_currentPage: 1,
         table_info: [],
-        table_info_show: [],
-        table_total: 0,
         table_size: 20,
         isload: false,
+        showMore: false,
+        sort: { prop: '', order: '' },
         filter_ap_name: '',
         filter_ap_mac: '',
         filter_ap_ip: '',
@@ -110,12 +169,62 @@
         filter_ap_group: '',
         filter_sw_version: '',
         filter_ac_id: '',
-        filter_online_status: '',
+        filter_online_status: '',  // 前端筛选，保持统计卡片为全量数据
         ac_list: [],
-        summary: { total: 0, online: 0, offline: 0, unknown: 0, clients: 0 },
+        summary: Object.assign({}, EMPTY_SUMMARY),
         selectedMac: '',
         drawerVisible: false,
       }
+    },
+    computed: {
+      statCards () {
+        const s = this.summary
+        const rate = s.total ? Math.round(s.online / s.total * 100) : 0
+        const cards = [
+          { key: 'total', status: '', label: 'AP 总数', value: s.total, icon: 'el-icon-connection', type: 'primary', filter: true },
+          { key: 'online', status: 'online', label: '在线', value: s.online, icon: 'el-icon-circle-check', type: 'success', filter: true },
+          { key: 'offline', status: 'offline', label: '离线', value: s.offline, icon: 'el-icon-circle-close', type: 'danger', filter: true },
+        ]
+        if (s.unknown) {
+          cards.push({ key: 'unknown', status: 'unknown', label: '未知', value: s.unknown, icon: 'el-icon-question', type: 'info', filter: true })
+        }
+        cards.push({ key: 'rate', label: '在线率', value: rate, unit: '%', icon: 'el-icon-pie-chart', type: rate >= 95 ? 'success' : 'warning', filter: false })
+        cards.push({ key: 'clients', label: '接入终端', value: s.clients, icon: 'el-icon-mobile-phone', type: 'primary', filter: false })
+        return cards
+      },
+      // 更多条件里已填写的数量，收起时提示
+      moreCount () {
+        return [this.filter_sn, this.filter_model, this.filter_ap_group, this.filter_sw_version].filter(v => String(v || '').trim()).length
+      },
+      filtered () {
+        const status = this.filter_online_status
+        if (!status) return this.table_info
+        // 与 statusText 保持一致：非 online/offline 都归为未知
+        const norm = s => (s === 'online' || s === 'offline') ? s : 'unknown'
+        return this.table_info.filter(r => norm(r.online_status) === status)
+      },
+      sorted () {
+        const { prop, order } = this.sort
+        if (!prop || !order) return this.filtered
+        const numeric = prop === 'client_count'
+        const list = this.filtered.slice()
+        list.sort((a, b) => {
+          let cmp
+          if (numeric) {
+            cmp = Number(a[prop] || 0) - Number(b[prop] || 0)
+          } else if (prop === 'ap_ip') {
+            cmp = this.ipValue(a[prop]) - this.ipValue(b[prop])
+          } else {
+            cmp = String(a[prop] || '').localeCompare(String(b[prop] || ''))
+          }
+          return order === 'descending' ? -cmp : cmp
+        })
+        return list
+      },
+      pageRows () {
+        const start = (this.table_currentPage - 1) * this.table_size
+        return this.sorted.slice(start, start + this.table_size)
+      },
     },
     created () {
       this.getViews()
@@ -139,7 +248,6 @@
           model: trim(this.filter_model),
           ap_group: trim(this.filter_ap_group),
           sw_version: trim(this.filter_sw_version),
-          online_status: this.filter_online_status,
         }
         const post_data = {}
         for (const k in fields) {
@@ -152,23 +260,40 @@
         this.isload = true
         wifiApi.getApList(post_data).then(res => {
           this.table_info = (res && res.list) || []
-          this.table_total = this.table_info.length
-          this.summary = (res && res.summary) || { total: 0, online: 0, offline: 0, unknown: 0, clients: 0 }
+          this.summary = (res && res.summary) || Object.assign({}, EMPTY_SUMMARY)
           this.table_currentPage = 1
-          this.table_info_show = this.table_info.slice(0, this.table_size)
         }).catch(err => {
           this.$message.error((err && err.message) || '查询 AP 列表失败')
         }).finally(() => {
           this.isload = false
         })
       },
+      resetFilter () {
+        this.filter_ap_name = ''
+        this.filter_ap_mac = ''
+        this.filter_ap_ip = ''
+        this.filter_sn = ''
+        this.filter_model = ''
+        this.filter_ap_group = ''
+        this.filter_sw_version = ''
+        this.filter_ac_id = ''
+        this.filter_online_status = ''
+        this.getViews()
+      },
+      setStatus (status) {
+        this.filter_online_status = status
+        this.table_currentPage = 1
+      },
+      onSort ({ prop, order }) {
+        this.sort = { prop: prop || '', order: order || '' }
+        this.table_currentPage = 1
+      },
       handleCurrentChange (val) {
         this.table_currentPage = val
-        this.table_info_show = this.table_info.slice((this.table_currentPage - 1) * this.table_size, this.table_currentPage * this.table_size)
       },
       handleSizeChange (val) {
         this.table_size = val
-        this.table_info_show = this.table_info.slice((this.table_currentPage - 1) * this.table_size, this.table_currentPage * this.table_size)
+        this.table_currentPage = 1
       },
       openDetail (row) {
         this.selectedMac = row.ap_mac
@@ -180,10 +305,29 @@
       statusTagType (s) {
         return { online: 'success', offline: 'danger' }[s] || 'info'
       },
+      ipValue (ip) {
+        const parts = String(ip || '').split('.')
+        if (parts.length !== 4) return -1
+        return parts.reduce((acc, p) => acc * 256 + (parseInt(p, 10) || 0), 0)
+      },
+      copyText (text) {
+        if (!text) return
+        const ta = document.createElement('textarea')
+        ta.value = text
+        document.body.appendChild(ta)
+        ta.select()
+        try {
+          document.execCommand('copy')
+          this.$message.success('已复制')
+        } catch (e) {
+          this.$message.error('复制失败')
+        }
+        document.body.removeChild(ta)
+      },
       // ==================== Excel导出相关 ====================
       download_table () {
-        // 生成新数组，downloadExcl 里的 unshift 不会污染 table_info
-        const rows = this.table_info.map(r => ({
+        // 导出当前筛选、排序后的结果；生成新数组，downloadExcl 里的 unshift 不会污染 table_info
+        const rows = this.sorted.map(r => ({
           'AP名称': r.ap_name,
           '状态': this.statusText(r.online_status),
           'MAC': r.ap_mac,
@@ -258,4 +402,249 @@
 </script>
 
 <style scoped>
+.wl-page {
+  color: #303133;
+}
+.mono {
+  font-family: Menlo, Consolas, "Courier New", monospace;
+}
+.mono-input /deep/ input {
+  font-family: Menlo, Consolas, "Courier New", monospace;
+}
+.empty-text {
+  color: #c0c4cc;
+}
+.sub-text {
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 标题栏 */
+.wl-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.wl-title {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+.wl-title > i {
+  margin-right: 8px;
+  font-size: 18px;
+  color: #409eff;
+}
+.wl-count {
+  margin-left: 8px;
+  padding: 0 8px;
+  height: 18px;
+  line-height: 18px;
+  font-size: 12px;
+  font-weight: normal;
+  border-radius: 9px;
+  color: #409eff;
+  background-color: #ecf5ff;
+}
+.wl-subtitle {
+  margin-left: 12px;
+  font-size: 12px;
+  font-weight: normal;
+  color: #909399;
+}
+
+/* 统计卡片 */
+.wl-stats {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -6px 12px;
+}
+.stat-card {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 150px;
+  margin: 0 6px 8px;
+  padding: 12px 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #fff;
+  transition: all .2s;
+}
+.stat-card.clickable {
+  cursor: pointer;
+}
+.stat-card.clickable:hover {
+  border-color: #c6e2ff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, .12);
+}
+.stat-card.active {
+  border-color: #409eff;
+  background: #f5faff;
+}
+.stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  margin-right: 12px;
+  font-size: 20px;
+  border-radius: 8px;
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 26px;
+}
+.stat-value small {
+  margin-left: 2px;
+  font-size: 13px;
+  font-weight: normal;
+}
+.stat-label {
+  font-size: 12px;
+  color: #909399;
+}
+.stat-primary .stat-icon { color: #409eff; background: #ecf5ff; }
+.stat-success .stat-icon { color: #67c23a; background: #f0f9eb; }
+.stat-danger .stat-icon { color: #f56c6c; background: #fef0f0; }
+.stat-warning .stat-icon { color: #e6a23c; background: #fdf6ec; }
+.stat-info .stat-icon { color: #909399; background: #f4f4f5; }
+.stat-success .stat-value { color: #67c23a; }
+.stat-danger .stat-value { color: #f56c6c; }
+.stat-warning .stat-value { color: #e6a23c; }
+
+/* 筛选栏 */
+.wl-filter {
+  padding: 12px 16px 4px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background-color: #fafbfc;
+}
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filter-row > * {
+  margin: 0 10px 8px 0;
+}
+.filter-row > .el-button + .el-button {
+  margin-left: 0;
+}
+.filter-more {
+  padding-top: 8px;
+  border-top: 1px dashed #ebeef5;
+}
+.f-input {
+  width: 180px;
+}
+.more-btn i {
+  margin-left: 2px;
+}
+.more-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  height: 16px;
+  line-height: 16px;
+  font-size: 12px;
+  border-radius: 8px;
+  color: #fff;
+  background: #409eff;
+}
+
+/* 表格 */
+.wl-table {
+  margin-top: 12px;
+}
+.wl-table /deep/ th {
+  color: #606266;
+  background-color: #f5f7fa !important;
+}
+.ap-link {
+  font-weight: 500;
+  color: #409eff;
+  cursor: pointer;
+}
+.ap-link:hover {
+  text-decoration: underline;
+}
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+}
+.status-dot::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+.dot-success { color: #67c23a; }
+.dot-success::before { background: #67c23a; box-shadow: 0 0 0 3px rgba(103, 194, 58, .18); }
+.dot-danger { color: #f56c6c; }
+.dot-danger::before { background: #f56c6c; box-shadow: 0 0 0 3px rgba(245, 108, 108, .18); }
+.dot-info { color: #909399; }
+.dot-info::before { background: #c0c4cc; }
+.chip {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 6px;
+  height: 20px;
+  line-height: 20px;
+  font-size: 12px;
+  border-radius: 3px;
+  color: #606266;
+  background: #f4f4f5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.client-num {
+  font-weight: 600;
+  color: #409eff;
+}
+.client-num.zero {
+  font-weight: normal;
+  color: #c0c4cc;
+}
+.two-line {
+  display: flex;
+  flex-direction: column;
+  line-height: 18px;
+}
+.two-line .sub {
+  font-size: 12px;
+  color: #909399;
+}
+.ellipsis,
+.two-line .sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.copy-btn {
+  margin-left: 6px;
+  color: #c0c4cc;
+  cursor: pointer;
+  visibility: hidden;
+}
+.wl-table /deep/ tr:hover .copy-btn {
+  visibility: visible;
+}
+.copy-btn:hover {
+  color: #409eff;
+}
+.wl-pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
 </style>

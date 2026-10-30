@@ -1,19 +1,19 @@
 <template>
-  <div style="display: flex;flex-direction: column;height: 100vh;">
-    <TopMenu ref="top_menu" @changeGroup="changeGroupItem" />
-    <div style="display: flex;flex: 1;overflow: hidden;">
-      <SideMenu ref="side_menu" @changeMenu="changeTab" />
-      <div style="flex: 1;margin: 10px;overflow-y: auto;display: flex;flex-direction: column;">
-        <TabMenu ref="tab_nav" style="padding-bottom: 10px;border-bottom: 1px solid #eee;"></TabMenu>
+  <div class="app-layout">
+    <TopMenu ref="top_menu" :collapsed="collapsed" @changeGroup="changeGroupItem" @toggleCollapse="toggleCollapse" />
+    <div class="app-body">
+      <SideMenu ref="side_menu" :collapsed="collapsed" @changeMenu="changeTab" />
+      <div class="app-main">
+        <TabMenu ref="tab_nav"></TabMenu>
         <!-- 这里是页面的主要内容区域 -->
-        <transition name="main" mode="out-in">
-          <!-- <el-card> -->
-          <router-view style="margin: 10px;"></router-view>
-          <!-- </el-card> -->
-        </transition>
+        <div class="app-content">
+          <transition name="main" mode="out-in">
+            <router-view class="page-container"></router-view>
+          </transition>
+        </div>
+        <Footer />
       </div>
     </div>
-    <Footer />
   </div>
 </template>
 
@@ -23,9 +23,15 @@ import SideMenu from "./SideMenu.vue"
 import Footer from "./Footer.vue"
 import TabMenu from "./TabMenu.vue"
 
+const COLLAPSE_KEY = "side_menu_collapsed"
 
 export default {
   name: "App",
+  data () {
+    return {
+      collapsed: localStorage.getItem(COLLAPSE_KEY) === "1"
+    }
+  },
   mounted () {
     const menuList = this.$store.state.allMenu.menuList;
 
@@ -40,6 +46,10 @@ export default {
     },
     changeTab(route){
       this.$refs.tab_nav.changeTab(route)
+    },
+    toggleCollapse(){
+      this.collapsed = !this.collapsed
+      localStorage.setItem(COLLAPSE_KEY, this.collapsed ? "1" : "0")
     }
   },
   components: {
@@ -51,16 +61,51 @@ export default {
 }
 </script>
 
+<style scoped>
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .app-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+  .app-main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    background-color: #f0f2f5;
+  }
+  .app-content {
+    flex: 1;
+    min-height: 0;
+    padding: 12px 16px 16px;
+    overflow-y: auto;
+    position: relative;
+  }
+
+  /* 页面内容卡片 */
+  .page-container {
+    box-sizing: border-box;
+    min-height: 100%;
+    padding: 16px;
+    background-color: #fff;
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  }
+</style>
+
 <style>
   .main-enter, .main-leave-to {
     opacity: 0;
-    transform: translateY(30px);
+    transform: translateX(-10px);
   }
-  .main-enter-active {
-    transition: all 0.2s;
-  }
+  .main-enter-active,
   .main-leave-active {
-    position: absolute;
-    transition: all 0.3s;
+    transition: all 0.2s;
   }
 </style>

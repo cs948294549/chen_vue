@@ -1,32 +1,33 @@
 <template>
-  <div>
+  <div class="side-menu" :class="{ collapsed: collapsed }">
     <el-menu
-      default-active="2"
-      class="el-menu-vertical"
-      background-color="#e8e8eb"
-      text-color="#27569b"
-      active-text-color="#27569b"
+      class="side-menu-list"
+      :default-active="activePath"
+      background-color="#1b2a3d"
+      text-color="#bfcbd9"
+      active-text-color="#ffffff"
+      :collapse="collapsed"
+      :collapse-transition="false"
       :unique-opened="true"
       :router="false"
       @select="selectmenu"
       v-if="refresh_flag">
-        <template v-for="(item, index) in route_list" v-if="!item.hide&&item.group == cur_group">
-          <el-submenu v-if="item.children.length>0" :index="index+''" :key="index">
+        <template v-for="(item, index) in visibleList">
+          <el-submenu v-if="item.children.length>0" :index="'sub-'+index" :key="'sub-'+index">
             <template slot="title">
-              <!-- <i :class="item.iconCls?item.iconCls:'el-icon-collection-tag'"></i> -->
+              <i :class="item.icon || 'el-icon-menu'"></i>
               <span slot="title">{{ item.name }}</span>
             </template>
 
             <template v-for="child in item.children">
-              <el-menu-item v-if="!child.hide" :index="child.path" :key="child.page_id">
-                <!-- <i :class="child.iconCls?child.iconCls:'el-icon-collection-tag'"></i> -->
+              <el-menu-item v-if="!child.hide" :index="child.path" :key="child.id || child.path">
                 <span slot="title">{{ child.name }}</span>
               </el-menu-item>
             </template>
           </el-submenu>
 
-          <el-menu-item v-else :index="item.path" :key="item.page_id">
-            <!-- <i :class="item.iconCls?item.iconCls:'el-icon-collection-tag'"></i> -->
+          <el-menu-item v-else :index="item.path" :key="item.id || item.path">
+            <i :class="item.icon || 'el-icon-document'"></i>
             <span slot="title">{{ item.name }}</span>
           </el-menu-item>
         </template>
@@ -37,6 +38,12 @@
 <script>
 export default {
   name: "SideMenu",
+  props: {
+    collapsed: {
+      type: Boolean,
+      default: false
+    }
+  },
   data () {
     return {
       route_list:[],
@@ -44,14 +51,19 @@ export default {
       refresh_flag: true
     }
   },
-  mounted () {
-    // this.getMenu()
+  computed: {
+    visibleList () {
+      return this.route_list.filter(item => !item.hide)
+    },
+    // 菜单 index 为不带前导 / 的 path，用当前路由高亮对应菜单
+    activePath () {
+      return this.$route.path.replace(/^\//, "")
+    }
   },
   methods: {
     getMenu () {
       this.$store.dispatch("sideMenu/fetchData").then(response => {
         this.userData = response
-        // console.log("结果===", response)
       }).catch(error => {
         console.error("获取数据失败:", error)
       })
@@ -76,7 +88,6 @@ export default {
     },
 
     selectmenu(index, index_path){
-      // console.log("选中===",index, index_path)
       let matched = false
       let navTitle=""
       let breadcrumbs = []
@@ -108,7 +119,6 @@ export default {
         }
       }
       this.$store.dispatch("tabnav/addTab",{"title":navTitle,"path":'/'+index,'breadcrumbs':breadcrumbs})
-      // this.$router.push({path:'/'+index, query:{}});
       this.$emit('changeMenu', {"title":navTitle,"path":'/'+index,'breadcrumbs':breadcrumbs});
     },
   },
@@ -117,10 +127,72 @@ export default {
 </script>
 
 <style scoped>
-.el-menu-vertical {
-  width: 200px;
-  min-height: 100vh;
-  overflow-y: scroll;
-  overflow-x: hide;
+.side-menu {
+  width: 210px;
+  height: 100%;
+  flex-shrink: 0;
+  background-color: #1b2a3d;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transition: width 0.2s;
+  box-shadow: 2px 0 6px rgba(0, 21, 41, 0.2);
+  position: relative;
+  z-index: 5;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.side-menu.collapsed {
+  width: 64px;
+}
+.side-menu::-webkit-scrollbar {
+  width: 6px;
+}
+.side-menu::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.side-menu-list {
+  border-right: none;
+}
+.side-menu-list:not(.el-menu--collapse) {
+  width: 210px;
+}
+
+.side-menu /deep/ .el-menu-item,
+.side-menu /deep/ .el-submenu__title {
+  height: 46px;
+  line-height: 46px;
+}
+.side-menu /deep/ .el-menu-item [class^="el-icon-"],
+.side-menu /deep/ .el-submenu__title [class^="el-icon-"] {
+  color: inherit;
+  font-size: 16px;
+}
+
+/* 二级菜单背景加深，区分层级 */
+.side-menu /deep/ .el-submenu .el-menu-item {
+  min-width: 0;
+  background-color: #14202f !important;
+}
+
+/* hover */
+.side-menu /deep/ .el-menu-item:hover,
+.side-menu /deep/ .el-submenu__title:hover,
+.side-menu /deep/ .el-submenu .el-menu-item:hover {
+  color: #ffffff !important;
+  background-color: #24364d !important;
+}
+
+/* 选中菜单：整行高亮 */
+.side-menu /deep/ .el-menu-item.is-active,
+.side-menu /deep/ .el-submenu .el-menu-item.is-active {
+  color: #ffffff !important;
+  background-color: #409eff !important;
+}
+
+/* 子菜单选中时父级标题高亮 */
+.side-menu /deep/ .el-submenu.is-active > .el-submenu__title {
+  color: #ffffff !important;
 }
 </style>

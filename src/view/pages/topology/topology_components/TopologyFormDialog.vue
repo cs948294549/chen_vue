@@ -1,16 +1,25 @@
 <template>
-  <el-dialog :title="title" :visible.sync="visible" width="600px" :close-on-click-modal="false" @close="handleClose">
-    <el-form ref="form" :model="formData" :rules="rules" label-width="100px" size="small">
+  <el-dialog
+    :visible="visible"
+    width="560px"
+    custom-class="topo-form-dialog"
+    :close-on-click-modal="false"
+    @close="handleClose">
+    <div slot="title" class="dialog-title">
+      <i :class="mode === 'create' ? 'el-icon-circle-plus-outline' : 'el-icon-edit-outline'"></i>{{ title }}
+    </div>
+    <el-form ref="form" :model="formData" :rules="rules" label-width="90px" size="small">
       <el-form-item label="拓扑名称" prop="topology_name">
-        <el-input v-model="formData.topology_name" placeholder="请输入拓扑名称"></el-input>
+        <el-input v-model="formData.topology_name" placeholder="请输入拓扑名称" maxlength="64" show-word-limit></el-input>
       </el-form-item>
       <el-form-item label="分类路径" prop="category_types">
         <el-select
           v-model="categoryInput"
-          placeholder="输入分类路径，如：按机房/IDC-A/核心层"
+          placeholder="选择已有分类，或直接输入新路径"
           clearable
           filterable
           allow-create
+          default-first-option
           style="width: 100%;"
           @change="handleCategoryChange">
           <el-option
@@ -18,14 +27,19 @@
             :key="item.value"
             :label="item.label"
             :value="item.value">
+            <i class="el-icon-folder opt-icon"></i>{{ item.label }}
           </el-option>
         </el-select>
-        <div style="margin-top: 5px; color: #999; font-size: 12px;">
-          提示：使用"/"分隔多级分类，例如：按机房/IDC-A/核心层
+        <div v-if="formData.category_types.length" class="path-preview">
+          <span v-for="(c, i) in formData.category_types" :key="i" class="path-item">
+            <i v-if="i > 0" class="el-icon-arrow-right path-sep"></i>
+            <span class="path-chip">{{ c }}</span>
+          </span>
         </div>
+        <div class="form-tip">使用"/"分隔多级分类，例如：按机房/IDC-A/核心层；留空则归入"未分类"</div>
       </el-form-item>
       <el-form-item label="描述">
-        <el-input v-model="formData.description" type="textarea" :rows="3" placeholder="请输入拓扑描述"></el-input>
+        <el-input v-model="formData.description" type="textarea" :rows="3" placeholder="请输入拓扑描述（可选）"></el-input>
       </el-form-item>
     </el-form>
     <span slot="footer">
@@ -148,4 +162,50 @@ export default {
 </script>
 
 <style scoped>
+.dialog-title {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+.dialog-title i {
+  margin-right: 6px;
+  color: #409eff;
+}
+.opt-icon {
+  margin-right: 6px;
+  color: #e6a23c;
+}
+.path-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 8px;
+}
+.path-item {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.path-chip {
+  padding: 0 8px;
+  height: 22px;
+  line-height: 22px;
+  font-size: 12px;
+  border-radius: 4px;
+  color: #409eff;
+  background: #ecf5ff;
+}
+.path-sep {
+  margin: 0 4px;
+  font-size: 12px;
+  color: #c0c4cc;
+}
+.form-tip {
+  margin-top: 4px;
+  line-height: 1.5;
+  font-size: 12px;
+  color: #909399;
+}
 </style>

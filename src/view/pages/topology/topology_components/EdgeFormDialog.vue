@@ -1,10 +1,32 @@
 <template>
   <el-dialog
-    :title="mode === 'create' ? '添加连接' : '编辑连接'"
     :visible.sync="dialogVisible"
-    width="600px"
+    width="560px"
+    :close-on-click-modal="false"
     @close="handleClose">
-    <el-form ref="form" :model="formData" :rules="rules" label-width="100px" size="small">
+    <div slot="title" class="dialog-title">
+      <i class="el-icon-connection"></i>{{ mode === 'create' ? '添加连接' : '编辑连接' }}
+    </div>
+
+    <!-- 连接预览 -->
+    <div class="link-preview">
+      <div class="lp-end" :class="{ empty: !formData.from }">
+        <div class="lp-label">源节点</div>
+        <div class="lp-name">{{ nodeLabel(formData.from) || '未选择' }}</div>
+        <div class="lp-ip">{{ formData.from || '-' }}</div>
+      </div>
+      <div class="lp-line">
+        <span class="lp-bar" :style="{ background: formData.color || '#333333' }"></span>
+        <span class="lp-text">{{ formData.label || '无描述' }}</span>
+      </div>
+      <div class="lp-end" :class="{ empty: !formData.to }">
+        <div class="lp-label">目标节点</div>
+        <div class="lp-name">{{ nodeLabel(formData.to) || '未选择' }}</div>
+        <div class="lp-ip">{{ formData.to || '-' }}</div>
+      </div>
+    </div>
+
+    <el-form ref="form" :model="formData" :rules="rules" label-width="90px" size="small">
       <el-form-item label="源节点" prop="from">
         <el-select v-model="formData.from" placeholder="请选择源节点" style="width: 100%;" filterable :disabled="mode === 'edit'">
           <el-option
@@ -12,6 +34,8 @@
             :key="node.id"
             :label="`${node.label} (${node.id})`"
             :value="node.id">
+            <span class="opt-name">{{ node.label }}</span>
+            <span class="opt-ip">{{ node.id }}</span>
           </el-option>
         </el-select>
       </el-form-item>
@@ -22,18 +46,21 @@
             v-for="node in nodeList"
             :key="node.id"
             :label="`${node.label} (${node.id})`"
-            :value="node.id">
+            :value="node.id"
+            :disabled="node.id === formData.from">
+            <span class="opt-name">{{ node.label }}</span>
+            <span class="opt-ip">{{ node.id }}</span>
           </el-option>
         </el-select>
       </el-form-item>
 
       <el-form-item label="连接描述" prop="label">
-        <el-input v-model="formData.label" placeholder="请输入连接描述（可选，如：10G）"></el-input>
+        <el-input v-model="formData.label" placeholder="可选，如：10G、2条线路"></el-input>
       </el-form-item>
 
       <el-form-item label="线条颜色" prop="color">
-        <el-color-picker v-model="formData.color"></el-color-picker>
-        <span style="margin-left: 10px; color: #909399; font-size: 12px;">默认为 #333333</span>
+        <el-color-picker v-model="formData.color" :predefine="colorPresets"></el-color-picker>
+        <span class="form-tip-inline">默认为 #333333</span>
       </el-form-item>
     </el-form>
 
@@ -71,6 +98,7 @@ export default {
     return {
       dialogVisible: false,
       submitting: false,
+      colorPresets: ['#333333', '#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#909399'],
 
       // 表单数据
       formData: {
@@ -106,6 +134,12 @@ export default {
   },
 
   methods: {
+    nodeLabel(id) {
+      if (!id) return ''
+      const node = this.nodeList.find(n => n.id === id)
+      return node ? node.label : id
+    },
+
     initForm() {
       if (this.mode === 'edit' && this.edgeData) {
         this.formData = {
@@ -171,4 +205,90 @@ export default {
 </script>
 
 <style scoped>
+.dialog-title {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+.dialog-title i {
+  margin-right: 6px;
+  color: #409eff;
+}
+
+.link-preview {
+  display: flex;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #fafbfc;
+}
+.lp-end {
+  width: 150px;
+  min-width: 0;
+  text-align: center;
+}
+.lp-end.empty .lp-name {
+  color: #c0c4cc;
+}
+.lp-label {
+  font-size: 12px;
+  color: #909399;
+}
+.lp-name {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lp-ip {
+  font-size: 12px;
+  color: #909399;
+  font-family: Menlo, Consolas, "Courier New", monospace;
+}
+.lp-line {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  margin: 0 10px;
+  text-align: center;
+}
+.lp-bar {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+}
+.lp-text {
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #606266;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opt-name {
+  float: left;
+}
+.opt-ip {
+  float: right;
+  margin-left: 16px;
+  font-size: 12px;
+  color: #8492a6;
+  font-family: Menlo, Consolas, "Courier New", monospace;
+}
+.form-tip-inline {
+  margin-left: 10px;
+  font-size: 12px;
+  color: #909399;
+  vertical-align: top;
+}
 </style>

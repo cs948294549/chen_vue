@@ -1,206 +1,218 @@
 <template>
-  <div>
-    <div style="display: flex;align-items: center;">
-      <div>
-        <div style="display: flex;margin: 20px;padding: 10px;align-items: center;border-bottom: gainsboro solid 1px;border-left: gainsboro solid 1px;border-top: gainsboro solid 1px;">
-          <img src="/static/images/h3_switch_core.svg" height="80" width="80"></img>
-          <div style="display: flex;flex-direction: column; margin-left: 10px;width: 400px;">
-            <div style="white-space: nowrap;">
-              <span>设备名：</span>
-              <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:device_info.ip}}">
-                <span>{{device_info.sysname}}</span>
-              </router-link>
-            </div>
-            <div style="white-space: nowrap;">
-              <span>设备IP：</span>
-              <router-link :to="{path: '/dailyManage/fmManageModule/device_detail', query:{dev:device_info.ip}}">
-                <span>{{device_info.ip}}</span>
-              </router-link>
-            </div>
-            <div style="white-space: nowrap;">
-              <span>采集时间：{{device_info.timestamp}}</span>
-            </div>
-            <span>---------------------</span>
-            <div style="white-space: inherit;">
-              <span>设备描述：{{device_info.sysdesc}}</span>
-            </div>
+  <div class="device-detail">
+    <!-- 设备概览 -->
+    <div class="dev-header" v-loading="devLoading">
+      <div class="dev-header-main">
+        <img src="/static/images/h3_switch_core.svg" class="dev-img">
+        <div class="dev-info">
+          <div class="dev-name-row">
+            <span class="dev-name">{{ device_info.sysname || '未知设备' }}</span>
+            <el-tag v-if="vendor" size="mini" effect="dark" class="vendor-tag">{{ vendor }}</el-tag>
+          </div>
+          <div class="dev-meta">
+            <span class="meta-item">
+              <i class="el-icon-place"></i>
+              <span class="mono">{{ device_info.ip || '-' }}</span>
+              <i v-if="device_info.ip" class="el-icon-document-copy copy-btn" title="复制" @click="copyText(device_info.ip)"></i>
+            </span>
+            <span class="meta-item">
+              <i class="el-icon-time"></i>采集时间：{{ device_info.timestamp || '-' }}
+            </span>
           </div>
         </div>
-        <div style="margin: 10px; display: flex; align-items: center;">
-          <div style="margin-top: 1px;">
-            <el-dropdown>
-              <span style="cursor: pointer;">
-                设备查询菜单<i class="el-icon-arrow-down el-icon--right"></i>
-              </span>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload1" @click="showtopo()" plain>相关设备</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disCommonFunc('dis_cu','当前配置','60%')" plain>当前配置</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="dislogging()" plain>最近日志</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disCommonFunc('dis_vlans','VLAN详情','60%')" plain>VLAN详情</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disarps()" plain>ARP详情</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disroutes()" plain>路由表</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disCommonFunc('dis_fan','风扇信息','60%')" plain>风扇</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disCommonFunc('dis_power','电源信息','60%')" plain>电源</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disCommonFunc('dis_cpu','CPU信息','60%')" plain>CPU</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disCommonFunc('dis_mem','内存信息','60%')" plain>内存</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disCommonFunc('dis_board','板卡信息','60%')" plain>板卡</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disCommonFunc('dis_inventory','序列号','60%')" plain>序列号</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disCommonFunc('dis_link_aggr','聚合口信息','60%')" plain>聚合口信息</el-button>
-                </el-dropdown-item>
-                <el-dropdown-item>
-                  <el-button type="text" :loading="isload" @click="disCommonFunc('dis_bgp_peer_v4','BGP状态','70%')" plain>BGP状态</el-button>
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </el-dropdown>
-          </div>
+        <div class="dev-actions">
+          <el-button size="small" icon="el-icon-refresh" :disabled="!device_info.ip" @click="refresh">刷新</el-button>
+          <el-button size="small" icon="el-icon-share" :loading="isload1" :disabled="!device_info.ip" @click="showtopo()">相关设备</el-button>
+          <el-button size="small" icon="el-icon-edit-outline" :disabled="!device_info.ip" @click="diy_exec">自定义查询</el-button>
+          <el-button size="small" type="primary" icon="el-icon-monitor" :disabled="!device_info.ip" @click="showXterm">远程连接</el-button>
+        </div>
+      </div>
+      <div class="dev-desc" :title="device_info.sysdesc">{{ device_info.sysdesc || '暂无设备描述' }}</div>
 
-          <div style="margin-top: 1px;margin-left: 20px;">
-            <el-button type="text" size="mini" style="padding: 7px 15px;border: 1px solid #dcdfe6;" @click="diy_exec" plain>自定义查询</el-button>
-          </div>
-          
-          <div style="margin-top: 1px;margin-left: 20px;">
-            <el-button type="primary" size="mini" @click="showXterm" plain>Xtern远程连接</el-button>
-          </div>
-
+      <!-- 端口统计，点击快速筛选 -->
+      <div class="stat-grid">
+        <div class="stat-item" :class="{ active: filter_portstatu === '' }" @click="quickStatus('')">
+          <div class="stat-value">{{ portStats.total }}</div>
+          <div class="stat-label">端口总数</div>
+        </div>
+        <div class="stat-item stat-up" :class="{ active: filter_portstatu === '1' }" @click="quickStatus('1')">
+          <div class="stat-value">{{ portStats.up }}</div>
+          <div class="stat-label">UP</div>
+        </div>
+        <div class="stat-item stat-down" :class="{ active: filter_portstatu === '2' }" @click="quickStatus('2')">
+          <div class="stat-value">{{ portStats.down }}</div>
+          <div class="stat-label">Down</div>
+        </div>
+        <div class="stat-item stat-admin" :class="{ active: filter_portstatu === '3' }" @click="quickStatus('3')">
+          <div class="stat-value">{{ portStats.adminDown }}</div>
+          <div class="stat-label">Admin Down</div>
+        </div>
+        <div class="stat-item stat-plain">
+          <div class="stat-value">{{ portStats.lldp }}</div>
+          <div class="stat-label">有 LLDP 邻居</div>
+        </div>
+        <div class="stat-item stat-plain">
+          <div class="stat-value">{{ portStats.withIp }}</div>
+          <div class="stat-label">有接口 IP</div>
         </div>
       </div>
     </div>
-    <div>
-      <div>
-        <el-row>
-          <el-form style="text-align: right; margin-right: 5px;" size="mini" :inline="true">
-            <el-form-item>
-              <el-input placeholder="端口名称" v-model="filter_portname" @keyup.enter.native="filter_ports" clearable></el-input>
-            </el-form-item>
-            <el-form-item>
-              <el-input placeholder="端口描述" v-model="filter_portalias" @keyup.enter.native="filter_ports" clearable></el-input>
-            </el-form-item>
-            <el-form-item>
-              <el-select v-model="filter_portstatu" placeholder="端口状态" clearable>
-                <el-option label="UP" value="1"></el-option>
-                <el-option label="Down" value="2"></el-option>
-                <el-option label="Admin Down" value="3"></el-option>
-                <el-option label="Unknown" value="4"></el-option>
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-input placeholder="接口IP" v-model="filter_ip" @keyup.enter.native="filter_ports" clearable></el-input>
-            </el-form-item>
-            <el-form-item>
-              <el-input placeholder="LLDP" v-model="filter_lldp" @keyup.enter.native="filter_ports" clearable></el-input>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="filter_ports()">筛选</el-button>
-            </el-form-item>
-          </el-form>
-        </el-row>
+
+    <!-- 设备快捷查询 -->
+    <div class="panel">
+      <div class="panel-title"><i class="el-icon-s-data"></i>设备查询</div>
+      <div class="quick-groups">
+        <div class="quick-group" v-for="g in quick_groups" :key="g.title">
+          <span class="quick-group-title">{{ g.title }}</span>
+          <el-button
+            v-for="q in g.items"
+            :key="q.key"
+            size="mini"
+            plain
+            :icon="loadingKey === q.key ? '' : q.icon"
+            :loading="loadingKey === q.key"
+            :disabled="!device_info.ip"
+            @click="runQuick(q)">{{ q.label }}</el-button>
+        </div>
       </div>
-      <el-table border :data.sync='port_info_show' @selection-change="handleSelectionChange" :default-sort = "{prop: 'port_id'}" size="mini">
-        <el-table-column type='selection' width='40'></el-table-column>
-        <!-- <el-table-column prop='port_id' label='端口ID' show-overflow-tooltip min-width='10' align='center'>
-        </el-table-column> -->
+    </div>
 
-        <el-table-column prop='if_name' label='端口名称' show-overflow-tooltip min-width='20' align='center'>
-        </el-table-column>
+    <!-- 端口列表 -->
+    <div class="panel">
+      <div class="port-toolbar">
+        <div class="panel-title">
+          <i class="el-icon-connection"></i>端口列表
+          <span class="port-count">{{ port_total }} / {{ port_info.length }}</span>
+        </div>
+        <el-form class="port-filter" size="mini" :inline="true" @submit.native.prevent>
+          <el-form-item>
+            <el-input placeholder="端口名称" v-model="filter_portname" @keyup.enter.native="filter_ports" clearable></el-input>
+          </el-form-item>
+          <el-form-item>
+            <el-input placeholder="端口描述" v-model="filter_portalias" @keyup.enter.native="filter_ports" clearable></el-input>
+          </el-form-item>
+          <el-form-item>
+            <el-select v-model="filter_portstatu" placeholder="端口状态" clearable @change="filter_ports" style="width: 120px;">
+              <el-option label="UP" value="1"></el-option>
+              <el-option label="Down" value="2"></el-option>
+              <el-option label="Admin Down" value="3"></el-option>
+              <el-option label="Unknown" value="4"></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-input placeholder="接口IP" v-model="filter_ip" @keyup.enter.native="filter_ports" clearable></el-input>
+          </el-form-item>
+          <el-form-item>
+            <el-input placeholder="LLDP 邻居" v-model="filter_lldp" @keyup.enter.native="filter_ports" clearable></el-input>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" icon="el-icon-search" @click="filter_ports()">筛选</el-button>
+            <el-button icon="el-icon-refresh-left" @click="resetFilter">重置</el-button>
+            <el-tooltip placement="top" content="支持正则匹配；端口名称、端口描述以 ~ 开头表示排除匹配项">
+              <i class="el-icon-question filter-help"></i>
+            </el-tooltip>
+          </el-form-item>
+        </el-form>
+      </div>
 
-        <el-table-column prop='speed' label='带宽' :formatter="speedFormat" show-overflow-tooltip min-width='10' align='center'>
-        </el-table-column>
-
-        <el-table-column prop='statu' label='状态' :formatter="statuFormat" show-overflow-tooltip min-width='10' align='center'>
-        </el-table-column>
-
-        <el-table-column prop='alias' label='描述' show-overflow-tooltip min-width='50' align='center'>
-        </el-table-column>
-
-        <el-table-column prop='gw_ips' label='接口ip' show-overflow-tooltip min-width='13' align='center'>
-          <template v-slot="scope">
-            <el-popover v-if="scope.row.gw_ips!=''" placement="bottom-start" width="800" trigger="hover" :open-delay="600">
-              <el-input type="textarea" v-model="scope.row.gw_ips" :autosize="{ minRows: 5, maxRows: 20 }"></el-input>
-              <el-button size="mini" type="info" plain slot="reference">接口IP</el-button>
-            </el-popover>
+      <el-table
+        :data="port_info_show"
+        v-loading="portLoading"
+        size="small"
+        stripe
+        class="port-table">
+        <el-table-column prop="if_name" label="端口名称" min-width="150" show-overflow-tooltip>
+          <template slot-scope="scope">
+            <span class="port-name">{{ scope.row.if_name }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop='lldp' label='lldp' show-overflow-tooltip min-width='20' align='center'>
-          <template v-slot="scope">
-            <div v-for='lldp in scope.row.lldp.split("\n")'>
-              <span v-if="lldp.split('/')[0]==''">{{lldp}}</span>
-              <el-link v-else :href="'/dailyManage/fmManageModule/device_detail?dev='+lldp.split('/')[0]" target="_blank">{{lldp.split("/")[1]}}</el-link>
-            </div>
+        <el-table-column label="状态" width="110" align="center">
+          <template slot-scope="scope">
+            <el-tag size="mini" :type="statusTagType(scope.row)">{{ statuFormat(scope.row) }}</el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column prop='timestamp' label='采集时间' show-overflow-tooltip min-width='15' align='center'>
+        <el-table-column prop="speed" label="带宽" width="80" align="center" :formatter="speedFormat"></el-table-column>
+
+        <el-table-column prop="alias" label="描述" min-width="220" show-overflow-tooltip>
+          <template slot-scope="scope">
+            <span v-if="scope.row.alias">{{ scope.row.alias }}</span>
+            <span v-else class="empty-text">-</span>
+          </template>
         </el-table-column>
 
-        <el-table-column label='操作' show-overflow-tooltip min-width='20' align='center'>
-          <template v-slot='scope'>
-            <div style="margin: 5px;">
-              <el-dropdown>
-                <span style="cursor: pointer;">
-                  查询菜单<i class="el-icon-arrow-down el-icon--right"></i>
-                </span>
-                <el-dropdown-menu slot="dropdown">
-                  <el-dropdown-item>
-                    <el-button size='small' type='text' :loading="isload" @click="disconfig(scope.row)">查看配置</el-button>
-                  </el-dropdown-item>
-                  <el-dropdown-item>
-                    <el-button size='small' type='text' :loading="isload" @click="disinterface(scope.row)">查看状态</el-button>
-                  </el-dropdown-item>
-                  <el-dropdown-item>
-                    <el-button size='small' type='text' :loading="isload" @click="distransceiver(scope.row)">查看光衰</el-button>
-                  </el-dropdown-item>
+        <el-table-column label="接口IP" min-width="170">
+          <template slot-scope="scope">
+            <template v-if="ipLines(scope.row.gw_ips).length">
+              <span class="mono">{{ ipLines(scope.row.gw_ips)[0] }}</span>
+              <el-popover v-if="ipLines(scope.row.gw_ips).length > 1" placement="bottom-start" trigger="hover" :open-delay="300" width="320">
+                <div class="ip-pop">
+                  <div class="mono" v-for="(ip, i) in ipLines(scope.row.gw_ips)" :key="i">{{ ip }}</div>
+                </div>
+                <el-tag slot="reference" size="mini" type="info" class="more-tag">+{{ ipLines(scope.row.gw_ips).length - 1 }}</el-tag>
+              </el-popover>
+            </template>
+            <span v-else class="empty-text">-</span>
+          </template>
+        </el-table-column>
 
-                  <el-dropdown-item>
-                    <el-button size='small' type='text' :loading="isload" @click="showEchartFlow(scope.row)">实时流量</el-button>
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </el-dropdown>
-            </div>
+        <el-table-column label="LLDP 邻居" min-width="200">
+          <template slot-scope="scope">
+            <template v-if="lldpLines(scope.row.lldp).length">
+              <div class="lldp-line" v-for="(n, i) in lldpLines(scope.row.lldp)" :key="i">
+                <span v-if="!n.ip">{{ n.raw }}</span>
+                <template v-else>
+                  <router-link class="lldp-link" :to="detailLink(n.ip)" :title="n.ip">{{ n.name }}</router-link>
+                  <span v-if="n.port" class="lldp-port">{{ n.port }}</span>
+                </template>
+              </div>
+            </template>
+            <span v-else class="empty-text">-</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column prop="timestamp" label="采集时间" width="160"></el-table-column>
+
+        <el-table-column label="操作" width="200" fixed="right">
+          <template slot-scope="scope">
+            <el-button size="mini" type="text" :loading="loadingKey === scope.row.if_name + '|cfg'" @click="disconfig(scope.row)">配置</el-button>
+            <el-button size="mini" type="text" :loading="loadingKey === scope.row.if_name + '|int'" @click="disinterface(scope.row)">状态</el-button>
+            <el-button size="mini" type="text" :loading="loadingKey === scope.row.if_name + '|trans'" @click="distransceiver(scope.row)">光衰</el-button>
+            <el-button size="mini" type="text" @click="showEchartFlow(scope.row)">流量</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <el-pagination @current-change='handleCurrentChange' :current-page='port_currentPage'  @size-change="handleSizeChange"
-      :page-sizes="[50, 100, 300, 500, 1000]" :page-size="50" layout='total, sizes, prev, pager, next' :total='port_total' style='float: right'></el-pagination><br/>
-
+      <div class="pager">
+        <el-pagination
+          @current-change="handleCurrentChange"
+          @size-change="handleSizeChange"
+          :current-page="port_currentPage"
+          :page-sizes="[50, 100, 300, 500, 1000]"
+          :page-size="port_pageSize"
+          layout="total, sizes, prev, pager, next"
+          :total="port_total"></el-pagination>
+      </div>
     </div>
-    <el-dialog :title="dialog_title" :visible.sync="dialog_Visible" :width="dialog_width">
+
+    <!-- 查询结果 -->
+    <el-dialog :title="dialog_title" :visible.sync="dialog_Visible" :width="dialog_width" class="output-dialog">
       <el-input
+        class="output-box"
         type="textarea"
-        :rows='dialog_rows'
+        :rows="dialog_rows"
         resize="none"
         readonly
         v-model="dialog_infos">
       </el-input>
+      <div slot="footer">
+        <el-button size="small" icon="el-icon-document-copy" @click="copyText(dialog_infos, true)">复制结果</el-button>
+        <el-button size="small" type="primary" @click="dialog_Visible = false">关闭</el-button>
+      </div>
     </el-dialog>
-    <el-dialog title="拓扑信息" :visible.sync="dialog_topo" width="80%">
-      <div>拓扑信息</div>
+
+    <el-dialog :title="'相关设备 - ' + (device_info.sysname || '')" :visible.sync="dialog_topo" width="80%">
       <topo_div
         v-bind:toponame="'test'"
         v-bind:position="topo_position"
@@ -211,73 +223,67 @@
       ></topo_div>
     </el-dialog>
 
-    <el-dialog title="执行命令窗口" :visible.sync="dialog_cmd_exec" width="60%">
-      <el-form size="mini">
-        <el-form-item label="命令">
-          <div>
-            <el-input style="width: 500px;" placeholder="命令" v-model="cmd_exec_str" clearable></el-input>
-            <el-button type="primary" :loading="loading_exec" @click="run_dev_cmds">执行</el-button>
+    <el-dialog :title="'自定义查询 - ' + (device_info.sysname || '') + ' ' + (device_info.ip || '')" :visible.sync="dialog_cmd_exec" width="75%">
+      <div class="cmd-layout">
+        <div class="cmd-main">
+          <div class="cmd-input">
+            <el-input placeholder="输入查询命令，回车执行" v-model="cmd_exec_str" size="small" clearable @keyup.enter.native="run_dev_cmds">
+              <template slot="prepend"><i class="el-icon-arrow-right"></i></template>
+            </el-input>
+            <el-button type="primary" size="small" icon="el-icon-video-play" :loading="loading_exec" @click="run_dev_cmds">执行</el-button>
           </div>
-          <el-popover
-            placement="right"
-            width="400"
-            trigger="hover">
-            <div>
-              <el-input
-                type="textarea"
-                placeholder=""
-                v-model="cmd_promot"
-                rows="20"
-                :readonly="true"
-              ></el-input>
-            </div>
-            <el-button slot="reference" size="mini" icon="el-icon-warning-outline" circle></el-button>
-          </el-popover>
-
-        </el-form-item>
-        <el-form-item label="结果">
           <el-input
+            class="output-box"
             type="textarea"
-            placeholder=""
+            placeholder="执行结果"
             v-model="cmd_exec_ret"
-            rows="30"
+            :rows="26"
+            resize="none"
             :readonly="true"
           ></el-input>
-        </el-form-item>
-      </el-form>
+        </div>
+        <div class="cmd-hints">
+          <div class="cmd-hints-title">常用命令参考<span>（点击填入）</span></div>
+          <div class="cmd-hints-list">
+            <template v-for="(h, i) in cmdHints">
+              <div v-if="h.header" :key="'h' + i" class="hint-header">{{ h.text.replace(/^#+\s*/, '') }}</div>
+              <div v-else-if="h.text.trim()" :key="'l' + i" class="hint-line" :title="h.text" @click="cmd_exec_str = h.cmd">{{ h.text }}</div>
+            </template>
+          </div>
+        </div>
+      </div>
     </el-dialog>
 
-    <el-dialog title="SSH窗口" :visible.sync="dialog_webssh" width="60%">
+    <el-dialog :title="'远程连接 - ' + webssh_target" :visible.sync="dialog_webssh" width="60%">
       <ssh_card
-        style="margin: 10px;"
         v-if="dialog_webssh"
         v-bind:target_ip="webssh_target"
         @close_session="closeWebsshSession"
       ></ssh_card>
     </el-dialog>
 
-    <el-dialog title="实时流量窗口" :visible.sync="dialog_flow" width="80%">
-      <div>采集间隔<span style="color: red;">{{flow_interval}}</span>秒</div>
-      <div v-if="dialog_flow" style="display: flex;">
-        <div>
+    <el-dialog :title="'实时流量 - ' + (flow_p_info.sysname || device_info.sysname || '') + ' ' + (flow_p_info.if_name || '')" :visible.sync="dialog_flow" width="80%">
+      <div class="flow-tip"><i class="el-icon-info"></i>采集间隔 <b>{{ flow_interval }}</b> 秒<span v-if="flow_p_info.alias">，端口描述：{{ flow_p_info.alias }}</span></div>
+      <div v-if="dialog_flow" class="flow-charts">
+        <div class="flow-chart">
           <echart_flow ref="device_sss1"
-          	v-bind:chartsname="'flow_band'"
-          	v-bind:port_info="flow_p_info"
-          	v-bind:chartsType="'line'"
-          	v-bind:chartswidth="'600px'"
-          	v-bind:chartsheight="'300px'"
-          	v-bind:interval="flow_interval"
-          	></echart_flow>
+            v-bind:chartsname="'flow_band'"
+            v-bind:port_info="flow_p_info"
+            v-bind:chartsType="'line'"
+            v-bind:chartswidth="'600px'"
+            v-bind:chartsheight="'300px'"
+            v-bind:interval="flow_interval"
+            ></echart_flow>
         </div>
-        <div>
+        <div class="flow-chart">
           <echart_error ref="device_sss2"
-          	v-bind:chartsname="'flow_error'"
-          	v-bind:port_info="flow_p_info"
-          	v-bind:chartsType="'line'"
-          	v-bind:chartswidth="'600px'"
-          	v-bind:chartsheight="'300px'"
-          	v-bind:interval="flow_interval"
-          	></echart_error>
+            v-bind:chartsname="'flow_error'"
+            v-bind:port_info="flow_p_info"
+            v-bind:chartsType="'line'"
+            v-bind:chartswidth="'600px'"
+            v-bind:chartsheight="'300px'"
+            v-bind:interval="flow_interval"
+            ></echart_error>
         </div>
       </div>
     </el-dialog>
@@ -300,18 +306,45 @@ export default {
   data () {
     return {
       port_total: 0,
-      port_currentPage: 0,
+      port_currentPage: 1,
       port_pageSize:50,
       query_filter:"",
       device_info:{},
       lldp_info:"",
       port_info:[],
+      port_filtered:[],
       port_info_show:[],
       filter_portname:"",
       filter_portalias:"",
       filter_portstatu:"",
       filter_ip:"",
       filter_lldp:"",
+      devLoading:false,
+      portLoading:false,
+
+      //设备快捷查询，action 为空的走 disCommonFunc 模板查询
+      quick_groups:[
+        {title: "基础信息", items: [
+          {key: "dis_cu", label: "当前配置", icon: "el-icon-document", title: "当前配置", width: "60%"},
+          {key: "log", label: "最近日志", icon: "el-icon-tickets", action: "dislogging"},
+          {key: "dis_inventory", label: "序列号", icon: "el-icon-price-tag", title: "序列号", width: "60%"},
+          {key: "dis_board", label: "板卡", icon: "el-icon-files", title: "板卡信息", width: "60%"},
+        ]},
+        {title: "硬件状态", items: [
+          {key: "dis_cpu", label: "CPU", icon: "el-icon-cpu", title: "CPU信息", width: "60%"},
+          {key: "dis_mem", label: "内存", icon: "el-icon-coin", title: "内存信息", width: "60%"},
+          {key: "dis_fan", label: "风扇", icon: "el-icon-wind-power", title: "风扇信息", width: "60%"},
+          {key: "dis_power", label: "电源", icon: "el-icon-lightning", title: "电源信息", width: "60%"},
+        ]},
+        {title: "表项协议", items: [
+          {key: "dis_vlans", label: "VLAN", icon: "el-icon-collection-tag", title: "VLAN详情", width: "60%"},
+          {key: "arp", label: "ARP", icon: "el-icon-sort", action: "disarps"},
+          {key: "route", label: "路由表", icon: "el-icon-guide", action: "disroutes"},
+          {key: "dis_link_aggr", label: "聚合口", icon: "el-icon-connection", title: "聚合口信息", width: "60%"},
+          {key: "dis_bgp_peer_v4", label: "BGP", icon: "el-icon-share", title: "BGP状态", width: "70%"},
+        ]},
+      ],
+      loadingKey:"",
 
       //查询信息展示窗口
       dialog_title:"",
@@ -319,7 +352,6 @@ export default {
       dialog_width: "30%",
       dialog_rows: 30,
       dialog_infos:"",
-      isload:false,
 
 
       //拓扑信息展示窗口
@@ -358,28 +390,62 @@ export default {
       cli_load:false,
     }
   },
+  computed: {
+    vendor () {
+      const desc = this.device_info.sysdesc || ""
+      if(/h3c/i.test(desc)) return "H3C"
+      if(/huawei|huarong/i.test(desc)) return "Huawei"
+      if(/cisco/i.test(desc)) return "Cisco"
+      if(/ruijie/i.test(desc)) return "Ruijie"
+      if(/arista/i.test(desc)) return "Arista"
+      if(/juniper/i.test(desc)) return "Juniper"
+      return ""
+    },
+    portStats () {
+      const stats = {total: this.port_info.length, up: 0, down: 0, adminDown: 0, lldp: 0, withIp: 0}
+      for(let i=0;i<this.port_info.length;i++){
+        const row = this.port_info[i]
+        const code = this.portStatusCode(row)
+        if(code === 1) stats.up++
+        else if(code === 2) stats.down++
+        else if(code === 3) stats.adminDown++
+        if(row.lldp && String(row.lldp).trim()) stats.lldp++
+        if(row.gw_ips && String(row.gw_ips).trim()) stats.withIp++
+      }
+      return stats
+    },
+    cmdHints () {
+      return (this.cmd_promot || "").split("\n").map(line => {
+        const m = line.match(/^[\x20-\x7e]+/)
+        return {text: line, header: /^#/.test(line), cmd: m ? m[0].trim() : line.trim()}
+      })
+    }
+  },
+  watch: {
+    // 在详情页内点击 LLDP 邻居跳转时，组件复用，需要重新加载
+    "$route.query.dev" (val) {
+      if(typeof(val)=="string" && val){
+        this.loadDevice(val)
+      }
+    }
+  },
   mounted() {
     let query = this.$route.query;
-    console.log(this.$store.getters.info)
     if(typeof(query.dev)!="string"){
       let cache = localStorage.getItem('fmManage_dev')
-      if(typeof(cache)!="string"){
-        console.log("no data")
-      }else{
+      if(typeof(cache)=="string"){
         //未带请求，使用缓存
-        let cache_info = JSON.parse(cache)
-        this.device_info = cache_info["device_info"]
-        this.port_info = cache_info["port_info"]
-        //加载数据
-        this.port_total = this.port_info.length
-        this.port_currentPage = 1
-        this.port_info_show = this.port_info.slice((this.port_currentPage-1)*this.port_pageSize,this.port_currentPage*this.port_pageSize)
+        try {
+          let cache_info = JSON.parse(cache)
+          this.device_info = cache_info["device_info"] || {}
+          this.setPorts(cache_info["port_info"])
+        } catch (e) {
+          console.log("缓存解析失败", e)
+        }
       }
     }else{
-      let dev_ip = query.dev
       // 带请求的直接刷新
-      this.getDeviceInfo(dev_ip)
-      this.getPorts(dev_ip)
+      this.loadDevice(query.dev)
     }
   },
   beforeRouteLeave(to, from, next) {
@@ -390,13 +456,25 @@ export default {
     next()
   },
   methods:{
+    loadDevice(ip){
+      this.getDeviceInfo(ip)
+      this.getPorts(ip)
+    },
+    refresh(){
+      if(this.device_info.ip){
+        this.loadDevice(this.device_info.ip)
+      }
+    },
     //查询操作
     getDeviceInfo(ip){
       let that = this
+      this.devLoading = true
       collector_api.getDevs({"ip":"^"+ip+"$"},{}).then(function(response){
-        that.device_info = response.data["data"][0]
+        that.device_info = (response.data["data"] || [])[0] || {"ip": ip}
+        that.devLoading = false
       }).catch(function (error) {
           console.log(error)
+          that.devLoading = false
           that.$message({
             type: 'error',
             message: '查询失败，请重试'
@@ -405,355 +483,241 @@ export default {
     },
     getPorts(ip){
       let that = this
+      this.portLoading = true
       collector_api.getPorts_ex({"ip":"^"+ip+"$"},{}).then(function(response){
         if(response.data!="failed"){
-          that.port_info = response.data["data"]
-          //获取lldp
-          //获取ip地址
-
-          that.port_total = that.port_info.length
-          that.port_currentPage = 1
-          that.port_info_show = that.port_info.slice((that.port_currentPage-1)*that.port_pageSize,that.port_currentPage*that.port_pageSize)
+          that.setPorts(response.data["data"])
         }
+        that.portLoading = false
       }).catch(function (error) {
           console.log(error)
+          that.portLoading = false
           that.$message({
             type: 'error',
             message: '查询失败，请重试'
           });
       })
+    },
+    setPorts(list){
+      this.port_info = Array.isArray(list) ? list : []
+      this.filter_ports()
     },
 
     //页面数据转换
     speedFormat(row, column){
-      return parseInt(row.speed/1000)+"G"
+      // speed 单位为 Mbps
+      const speed = parseInt(row.speed)
+      if(!speed){
+        return "-"
+      }
+      if(speed >= 1000){
+        return parseFloat((speed / 1000).toFixed(1)) + "G"
+      }
+      return speed + "M"
+    },
+    // 1:UP 2:Down 3:Admin Down 4:Unknown
+    portStatusCode(row){
+      if(row.oper_statu=="1"){
+        return 1
+      }else if(row.admin_statu=="1"){
+        return 2
+      }else if(row.admin_statu=="2"){
+        return 3
+      }
+      return 4
     },
     statuFormat(row, column){
-      if(row.oper_statu=="1"){
-        return "UP"
-      }else if(row.admin_statu=="1"){
-        return "Down"
-      }else if(row.admin_statu=="2"){
-        return "Admin Down"
-      }else{
-        return "Unknown"
-      }
+      return ["", "UP", "Down", "Admin Down", "Unknown"][this.portStatusCode(row)]
     },
+    statusTagType(row){
+      return ["", "success", "danger", "info", "warning"][this.portStatusCode(row)]
+    },
+    ipLines(str){
+      return (str || "").split("\n").map(s => s.trim()).filter(Boolean)
+    },
+    // lldp 每行格式：邻居IP/邻居名称[/邻居端口]
+    lldpLines(str){
+      return (str || "").split("\n").filter(s => s.trim()).map(line => {
+        const parts = line.split("/")
+        return {raw: line, ip: parts[0], name: parts[1] || line, port: parts.slice(2).join("/")}
+      })
+    },
+    detailLink(ip){
+      return {path: '/pages/device/device_detail', query: {dev: ip}}
+    },
+
     //弹出对话框展示查询信息
     dialog_show(title, msg, width="60%",rows=20){
+      msg = msg === undefined || msg === null ? "" : String(msg)
       this.dialog_title = title
       this.dialog_width = width
       let arrys = msg.split("\n")
-      if(arrys.length<=30){
-        this.dialog_rows = arrys.length
-      }else{
-        this.dialog_rows = 30
-      }
+      this.dialog_rows = Math.max(Math.min(arrys.length, 30), 5)
       this.dialog_infos = msg
       this.dialog_Visible = true
-      this.isload = false
+      this.loadingKey = ""
+    },
+    // 通用：发起查询并弹窗展示结果
+    fetchAndShow(key, request, title, width){
+      let that = this
+      this.loadingKey = key
+      request().then(function(response){
+        that.dialog_show(title, response.data["data"], width)
+      }).catch(function (error) {
+          console.log(error)
+          that.loadingKey = ""
+          that.$message({
+            type: 'error',
+            message: '查询失败，请重试'
+          });
+      })
+    },
+    runQuick(q){
+      if(q.action){
+        this[q.action]()
+      }else{
+        this.disCommonFunc(q.key, q.title, q.width)
+      }
     },
 
     //表格操作
-    //多选
-    handleSelectionChange(val) {
-      this.multipleSelection = val;
+    updatePage(){
+      this.port_total = this.port_filtered.length
+      this.port_info_show = this.port_filtered.slice((this.port_currentPage-1)*this.port_pageSize,this.port_currentPage*this.port_pageSize)
     },
     //修改页码
     handleCurrentChange (val) {
       this.port_currentPage = val
-      this.port_info_show = this.port_info.slice((this.port_currentPage-1)*this.port_pageSize,this.port_currentPage*this.port_pageSize)
+      this.updatePage()
     },
     //修改一页总数
     handleSizeChange(val){
       this.port_pageSize = val
-      this.port_info_show = this.port_info.slice((this.port_currentPage-1)*this.port_pageSize,this.port_currentPage*this.port_pageSize)
+      this.port_currentPage = 1
+      this.updatePage()
     },
-    //筛选过滤
+    quickStatus(code){
+      this.filter_portstatu = code
+      this.filter_ports()
+    },
+    resetFilter(){
+      this.filter_portname = ""
+      this.filter_portalias = ""
+      this.filter_portstatu = ""
+      this.filter_ip = ""
+      this.filter_lldp = ""
+      this.filter_ports()
+    },
+    //筛选过滤，各条件之间为“且”的关系
     filter_ports(){
-      let port_name = this.filter_portname.replace(/^\s*|\s*$/g,"")
-      let port_alias =this.filter_portalias.replace(/^\s*|\s*$/g,"")
-      let status = this.filter_portstatu
-      let gw_ip = this.filter_ip
-      let f_lldp = this.filter_lldp
-
-      let reg_name = ""
-      let reg_name_flag = false
-      if(port_name[0]=="~"){
-        reg_name_flag = true
-        port_name = port_name.substring(1)
-      }
-
-      let reg_alias = ""
-      let reg_alias_flag = false
-      if(port_alias[0]=="~"){
-        reg_alias_flag = true
-        port_alias = port_alias.substring(1)
-      }
-
-      let reg_gw = ""
-      let reg_lldp = ""
-
-      let reg_status = ""
-      if(port_name){
-        reg_name = RegExp(port_name, "i")
-      }
-      if(port_alias){
-        reg_alias = RegExp(port_alias, "i")
-      }
-      if(status){
-        reg_status = status
-      }
-      if(gw_ip){
-        reg_gw = RegExp(gw_ip, "i")
-      }
-      if(f_lldp){
-        reg_lldp = RegExp(f_lldp, "i")
-      }
-
-      this.port_info_show = []
-      for(let i=0;i<this.port_info.length;i++){
-        let add_flag = true
-        if(reg_name!=""){
-          if(reg_name.test(this.port_info[i].if_name)){
-            if(reg_name_flag==true){
-              add_flag = false
-            }
-          }else{
-            if(reg_name_flag==true){
-              add_flag = true
-            }else{
-              add_flag = false
-            }
-          }
+      // 以 ~ 开头表示取反
+      const buildReg = (str, allowNeg) => {
+        str = (str || "").replace(/^\s*|\s*$/g,"")
+        let neg = false
+        if(allowNeg && str[0]=="~"){
+          neg = true
+          str = str.substring(1)
         }
-        if(reg_alias!=""){
-          if(reg_alias.test(this.port_info[i].alias)){
-            if(reg_alias_flag==true){
-              add_flag = false
-            }
-          }else{
-            if(reg_alias_flag==true){
-              add_flag = true
-            }else{
-              add_flag = false
-            }
-          }
-        }
-        if(reg_status!=""){
-          let change_flag=0
-          if(this.port_info[i].oper_statu=='1'){
-            change_flag=1
-          }else if(this.port_info[i].admin_statu=='1'){
-            change_flag=2
-          }else if(this.port_info[i].admin_statu=='2'){
-            change_flag=3
-          }else{
-            change_flag=4
-          }
-          if(reg_status==change_flag){
-
-          }else{
-            add_flag = false
-          }
-        }
-
-        if(reg_gw!=""){
-          if(reg_gw.test(this.port_info[i].gw_ips)){
-            add_flag = true
-          }else{
-            add_flag = false
-          }
-        }
-
-        if(reg_lldp!=""){
-          if(reg_lldp.test(this.port_info[i].lldp)){
-            add_flag = true
-          }else{
-            add_flag = false
-          }
-        }
-
-
-        if(add_flag===true){
-          this.port_info_show.push(this.port_info[i])
-        }
+        return str ? {reg: RegExp(str, "i"), neg: neg} : null
       }
+
+      let f_name, f_alias, f_gw, f_lldp
+      try {
+        f_name = buildReg(this.filter_portname, true)
+        f_alias = buildReg(this.filter_portalias, true)
+        f_gw = buildReg(this.filter_ip, false)
+        f_lldp = buildReg(this.filter_lldp, false)
+      } catch (e) {
+        this.$message({type: 'warning', message: '筛选条件不是合法的正则表达式'})
+        return
+      }
+      const match = (f, val) => !f || (f.reg.test(val || "") !== f.neg)
+      const status = this.filter_portstatu
+
+      this.port_filtered = this.port_info.filter(row => {
+        if(!match(f_name, row.if_name)) return false
+        if(!match(f_alias, row.alias)) return false
+        if(status && String(this.portStatusCode(row)) !== String(status)) return false
+        if(!match(f_gw, row.gw_ips)) return false
+        if(!match(f_lldp, row.lldp)) return false
+        return true
+      })
+      this.port_currentPage = 1
+      this.updatePage()
     },
     //配置操作
     disconfig(row){
-      let that =this
-      this.isload = true
-      collector_api.getCurrentInterface({"ip":row.ip,"if_name":row.if_name},{}).then(function(response){
-        that.dialog_show("接口配置", response.data["data"])
-      }).catch(function (error) {
-          console.log(error)
-          that.isload = false
-          that.$message({
-            type: 'error',
-            message: '查询失败，请重试'
-          });
-      })
+      this.fetchAndShow(row.if_name + "|cfg", () => collector_api.getCurrentInterface({"ip":row.ip,"if_name":row.if_name},{}), "接口配置 - " + row.if_name, "60%")
     },
     //查看端口状态
     disinterface(row){
-      let that =this
-      this.isload = true
-      collector_api.getInterface({"ip":row.ip,"if_name":row.if_name},{}).then(function(response){
-        that.dialog_show("接口状态", response.data["data"], "50%")
-      }).catch(function (error) {
-          console.log(error)
-          that.isload = false
-          that.$message({
-            type: 'error',
-            message: '查询失败，请重试'
-          });
-      })
+      this.fetchAndShow(row.if_name + "|int", () => collector_api.getInterface({"ip":row.ip,"if_name":row.if_name},{}), "接口状态 - " + row.if_name, "50%")
     },
     //查看端口光衰
     distransceiver(row){
-      let that =this
-      this.isload = true
-      collector_api.getTransceiver({"ip":row.ip,"if_name":row.if_name},{}).then(function(response){
-        that.dialog_show("接口光衰信息", response.data["data"], "50%")
-      }).catch(function (error) {
-          console.log(error)
-          that.isload = false
-          that.$message({
-            type: 'error',
-            message: '查询失败，请重试'
-          });
-      })
+      this.fetchAndShow(row.if_name + "|trans", () => collector_api.getTransceiver({"ip":row.ip,"if_name":row.if_name},{}), "接口光衰信息 - " + row.if_name, "50%")
     },
 
     //查看日志
     dislogging(){
-      let that =this
-      this.isload = true
-      this.$prompt('请输入日志长度，默认200', '选项', {
+      this.$prompt('请输入日志长度，默认200', '最近日志', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         inputPattern: /(\d+)|(\s*)/,
         inputErrorMessage: '格式不正确'
       }).then(({ value }) => {
-          collector_api.getLogging({"ip":that.device_info.ip,"size":value},{}).then(function(response){
-            that.dialog_show("设备日志", response.data["data"], "80%")
-          }).catch(function (error) {
-              console.log(error)
-              that.$message({
-                type: 'error',
-                message: '查询失败，请重试'
-              });
-          })
+        this.fetchAndShow("log", () => collector_api.getLogging({"ip":this.device_info.ip,"size":value},{}), "设备日志", "80%")
       }).catch(() => {
         this.$message({
           type: 'info',
           message: '取消输入'
         });
-        that.isload = false
       });
     },
 
     //查看arp信息
     disarps(){
-      let that =this
-      this.isload = true
-      this.$prompt('请输入地址所在VLAN或明细地址，默认全部展示', '选项', {
+      this.$prompt('请输入地址所在VLAN或明细地址，默认全部展示', 'ARP 查询', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         inputPattern: /(\d+)|(\s*)|([\d.]+)/,
         inputErrorMessage: '格式不正确'
       }).then(({ value }) => {
         let ipReg=/^((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})(\.((2(5[0-5]|[0-4]\d))|[0-1]?\d{1,2})){3}$/;
+        let params = {"ip":this.device_info.ip,"vlan_id":"","arp_ip":""}
         if(ipReg.test(value)){
-          collector_api.getARPs({"ip":this.device_info.ip,"vlan_id":"","arp_ip":value},{}).then(function(response){
-            that.dialog_show("设备ARP", response.data["data"], "50%")
-          }).catch(function (error) {
-              console.log(error)
-              that.$message({
-                type: 'error',
-                message: '查询失败，请重试'
-              });
-          })
+          params["arp_ip"] = value
         }else if(/\d+/.test(value)){
-          collector_api.getARPs({"ip":this.device_info.ip,"vlan_id":value,"arp_ip":""},{}).then(function(response){
-            that.dialog_show("设备ARP", response.data["data"], "50%")
-          }).catch(function (error) {
-              console.log(error)
-              that.$message({
-                type: 'error',
-                message: '查询失败，请重试'
-              });
-          })
-        }else{
-          collector_api.getARPs({"ip":this.device_info.ip,"vlan_id":"","arp_ip":""},{}).then(function(response){
-            that.dialog_show("设备ARP", response.data["data"], "50%")
-          }).catch(function (error) {
-              console.log(error)
-              that.$message({
-                type: 'error',
-                message: '查询失败，请重试'
-              });
-          })
+          params["vlan_id"] = value
         }
+        this.fetchAndShow("arp", () => collector_api.getARPs(params,{}), "设备ARP", "50%")
       }).catch(() => {
         this.$message({
           type: 'info',
           message: '取消输入'
         });
-        that.isload = false
       });
     },
 
     //查询路由表
     disroutes(){
-      let that =this
-      this.isload = true
-      this.$prompt('请输入IP地址，默认为127.0.0.1', '选项', {
+      this.$prompt('请输入IP地址，默认为127.0.0.1', '路由表查询', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         inputPattern: /([\d.]+)|(\s*)/,
         inputErrorMessage: '格式不正确'
       }).then(({ value }) => {
-          collector_api.getRoutes({"ip":that.device_info.ip,"route":value},{}).then(function(response){
-            that.dialog_show("设备路由", response.data["data"], "80%")
-          }).catch(function (error) {
-              console.log(error)
-              that.$message({
-                type: 'error',
-                message: '查询失败，请重试'
-              });
-          })
+        this.fetchAndShow("route", () => collector_api.getRoutes({"ip":this.device_info.ip,"route":value},{}), "设备路由", "80%")
       }).catch(() => {
         this.$message({
           type: 'info',
           message: '取消输入'
         });
-        that.isload = false
       });
     },
 
     disCommonFunc(temp,title,width){
-      let width_local = "50%"
-      if(width){
-        width_local = width
-      }
-      let title_local = "信息展示"
-      if(title){
-        title_local = title
-      }
-      let that =this
-      this.isload = true
-      collector_api.getCommonFunction({"ip":this.device_info.ip, "template_name":temp},{}).then(function(response){
-        that.dialog_show(title, response.data["data"], width_local)
-      }).catch(function (error) {
-          console.log(error)
-          that.isload = false
-          that.$message({
-            type: 'error',
-            message: '查询失败，请重试'
-          });
-      })
+      this.fetchAndShow(temp, () => collector_api.getCommonFunction({"ip":this.device_info.ip, "template_name":temp},{}), title || "信息展示", width || "50%")
     },
 
 
@@ -763,7 +727,6 @@ export default {
       this.isload1 = true
       if(this.device_info.ip){
         collector_api.getLLDPS({"loc_ip":"^"+this.device_info.ip+"$"},{}).then(function(response){
-          console.log("lldp===",response.data)
           if(response.data["code"]===0){
             let topo_info = []
             let lldp_data = response.data["data"]
@@ -780,8 +743,7 @@ export default {
             }
             that.create_topo(topo_info)
           }else{
-            collector_api.getLLDPS({"rem_ip":"^"+this.device_info.ip+"$"},{}).then(function(response){
-              console.log("lldp===",response.data)
+            collector_api.getLLDPS({"rem_ip":"^"+that.device_info.ip+"$"},{}).then(function(response){
               if(response.data["code"]===0){
                 let topo_info = []
                 let lldp_data = response.data["data"]
@@ -855,8 +817,7 @@ export default {
       this.topo_nodes = [{"id":this.device_info.ip,"label":this.device_info.sysname,"title":this.device_info.ip,"group":"switch","x":0,"y":0}]
       this.topo_links = []
 
-      //ut 0
-      //dt
+      //ut 上联一排，pt 平行一排，dt 下联多排
       let ut_position = 0
       let pt_position = 0
       let dt_position = 0
@@ -866,8 +827,6 @@ export default {
           continue
         }
         let node_label = {}
-        //{"id":"1","label":"t1","title":"隐藏t1","group":"router","x":0, "y":0},
-        //{"id":"1","from":"1","to":"2","label":"test","color":{"color":"#333"}},
         node_label["id"] = neighbors[i]
         node_label["label"] = this.lldp_data[neighbors[i]]["name"]+"_"+neighbors[i]
         node_label["title"] = neighbors[i]
@@ -886,7 +845,7 @@ export default {
           if(pt_position>0){
             pt_position = -(pt_position)
           }else{
-            pt_position = pt_position + 300
+            pt_position = -pt_position + 300
           }
         }else{
           node_label["x"] = dt_position
@@ -932,26 +891,17 @@ export default {
         "arista": "## arista\nshow int 接口 trans csv收发光\nshow inventory 查sn\nshow ip bgp summary vrf all 查bgp vrf邻居\nshow ip bgp neighbors 1.1.1.1 advertised-routes\nshow environment power电源\nshow system envir cooling风扇",
         "juniper": "## Juniper\nshow chassis hardware detail 查sn\nshow chassis fpc\n"
       }
-      if(/h3c/ig.test(this.device_info["sysdesc"])){
-        this.cmd_promot=exec_promot_dict["h3c"]
-      }else if(/huawei/ig.test(this.device_info["sysdesc"])|/huarong/ig.test(this.device_info["sysdesc"])){
-        this.cmd_promot=exec_promot_dict["huawei"]
-      }else if(/cisco/ig.test(this.device_info["sysdesc"])){
-        this.cmd_promot=exec_promot_dict["cisco"]
-      }else if(/ruijie/ig.test(this.device_info["sysdesc"])){
-        this.cmd_promot=exec_promot_dict["ruijie"]
-      }else if(/arista/ig.test(this.device_info["sysdesc"])){
-        this.cmd_promot=exec_promot_dict["arista"]
-      }else if(/juniper/ig.test(this.device_info["sysdesc"])){
-        this.cmd_promot=exec_promot_dict["juniper"]
-      }else{
-        this.cmd_promot=exec_promot_dict["h3c"]
-      }
+      const vendorKey = this.vendor ? this.vendor.toLowerCase() : "h3c"
+      this.cmd_promot = exec_promot_dict[vendorKey] || exec_promot_dict["h3c"]
     },
 
     run_dev_cmds(){
       let that = this
       let cmds = this.cmd_exec_str.replace(/^\s*|\s*$/g,"")
+      if(!cmds){
+        this.$message({type: 'warning', message: '请输入命令'})
+        return
+      }
       let post_data = {
         "ip": this.device_info["ip"],
         "cmds": cmds
@@ -972,10 +922,7 @@ export default {
 
     },
 
-
-
     showEchartFlow(row){
-      // console.log("展示实时流量图", row, this.device_info)
       let temp = {
         "ip":row["ip"],
         "if_name":row["if_name"],
@@ -993,17 +940,400 @@ export default {
       this.dialog_flow=true
     },
     showXterm(){
-      // console.log("当前设备===", this.device_info)
       this.webssh_target = this.device_info["ip"]
       this.dialog_webssh=true;
     },
     closeWebsshSession(){
       this.dialog_webssh=false;
     },
+
+    copyText(text, showShort){
+      if(!text){
+        return
+      }
+      const done = () => this.$message({type: 'success', message: showShort ? '已复制' : '已复制：' + text, duration: 1500})
+      if(navigator.clipboard && window.isSecureContext){
+        navigator.clipboard.writeText(text).then(done)
+        return
+      }
+      const ta = document.createElement("textarea")
+      ta.value = text
+      ta.style.position = "fixed"
+      ta.style.opacity = "0"
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand("copy")
+      document.body.removeChild(ta)
+      done()
+    },
   }
-  
+
 }
 </script>
 
-<style>
+<style scoped>
+.device-detail {
+  color: #303133;
+}
+.mono {
+  font-family: Menlo, Consolas, "Courier New", monospace;
+}
+.empty-text {
+  color: #c0c4cc;
+}
+
+/* 设备概览 */
+.dev-header {
+  padding: 18px 20px 16px;
+  border-radius: 6px;
+  border: 1px solid #e3eefc;
+  background: linear-gradient(135deg, #eef5ff 0%, #f7fbff 60%, #ffffff 100%);
+}
+.dev-header-main {
+  display: flex;
+  align-items: center;
+}
+.dev-img {
+  width: 60px;
+  height: 60px;
+  padding: 6px;
+  border-radius: 10px;
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
+}
+.dev-info {
+  flex: 1;
+  min-width: 0;
+  margin-left: 16px;
+}
+.dev-name-row {
+  display: flex;
+  align-items: center;
+}
+.dev-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2d3d;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vendor-tag {
+  margin-left: 10px;
+}
+.dev-meta {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 13px;
+  color: #606266;
+}
+.meta-item {
+  margin-right: 24px;
+  line-height: 22px;
+}
+.meta-item > i:first-child {
+  margin-right: 4px;
+  color: #909399;
+}
+.dev-actions {
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+.dev-desc {
+  margin-top: 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #606266;
+  background-color: rgba(255, 255, 255, 0.75);
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+
+/* 端口统计 */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.stat-item {
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: 1px solid #ebeef5;
+  border-left: 3px solid #409eff;
+  background-color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.stat-item:hover,
+.stat-item.active {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-color: #b3d8ff;
+  border-left-color: #409eff;
+}
+.stat-item.active {
+  background-color: #ecf5ff;
+}
+.stat-up { border-left-color: #67c23a !important; }
+.stat-down { border-left-color: #f56c6c !important; }
+.stat-admin { border-left-color: #909399 !important; }
+.stat-plain {
+  border-left-color: #c0c4cc !important;
+  cursor: default;
+}
+.stat-plain:hover {
+  box-shadow: none;
+  border-color: #ebeef5;
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.stat-up .stat-value { color: #67c23a; }
+.stat-down .stat-value { color: #f56c6c; }
+.stat-label {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 面板 */
+.panel {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background-color: #fff;
+}
+.panel-title {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+}
+.panel-title > i {
+  margin-right: 6px;
+  color: #409eff;
+}
+
+/* 快捷查询 */
+.quick-groups {
+  margin-top: 10px;
+}
+.quick-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 6px 0;
+}
+.quick-group + .quick-group {
+  border-top: 1px dashed #ebeef5;
+}
+.quick-group-title {
+  width: 72px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: #909399;
+}
+.quick-group .el-button {
+  margin: 3px 8px 3px 0;
+}
+
+/* 端口列表 */
+.port-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.port-count {
+  margin-left: 8px;
+  padding: 0 8px;
+  height: 18px;
+  line-height: 18px;
+  font-size: 12px;
+  font-weight: normal;
+  border-radius: 9px;
+  color: #409eff;
+  background-color: #ecf5ff;
+}
+.port-filter {
+  margin-top: 6px;
+}
+.port-filter /deep/ .el-form-item {
+  margin-bottom: 6px;
+  margin-right: 8px;
+}
+.port-filter /deep/ .el-input {
+  width: 140px;
+}
+.filter-help {
+  margin-left: 8px;
+  color: #909399;
+  cursor: help;
+}
+.port-table {
+  margin-top: 6px;
+}
+.port-table /deep/ th {
+  color: #606266;
+  background-color: #f5f7fa !important;
+}
+.port-name {
+  font-weight: 500;
+  font-family: Menlo, Consolas, "Courier New", monospace;
+}
+.more-tag {
+  margin-left: 6px;
+  cursor: pointer;
+}
+.ip-pop {
+  max-height: 300px;
+  overflow-y: auto;
+  line-height: 22px;
+}
+.lldp-line {
+  line-height: 20px;
+}
+.lldp-link {
+  color: #409eff;
+  text-decoration: none;
+}
+.lldp-link:hover {
+  text-decoration: underline;
+}
+.lldp-port {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #909399;
+}
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+/* 复制按钮 */
+.copy-btn {
+  margin-left: 6px;
+  color: #409eff;
+  cursor: pointer;
+}
+
+/* 命令输出：终端风格 */
+.output-box /deep/ .el-textarea__inner {
+  padding: 10px 12px;
+  font-family: Menlo, Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #d4d4d4;
+  background-color: #1e1e1e;
+  border-color: #1e1e1e;
+}
+.output-box /deep/ .el-textarea__inner::placeholder {
+  color: #6a6a6a;
+}
+.output-dialog /deep/ .el-dialog__body {
+  padding: 10px 20px;
+}
+
+/* 自定义查询 */
+.cmd-layout {
+  display: flex;
+}
+.cmd-main {
+  flex: 1;
+  min-width: 0;
+}
+.cmd-input {
+  display: flex;
+  margin-bottom: 10px;
+}
+.cmd-input .el-input {
+  flex: 1;
+  margin-right: 8px;
+}
+.cmd-input /deep/ .el-input__inner {
+  font-family: Menlo, Consolas, "Courier New", monospace;
+}
+.cmd-hints {
+  width: 300px;
+  flex-shrink: 0;
+  margin-left: 14px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.cmd-hints-title {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+}
+.cmd-hints-title span {
+  font-weight: normal;
+  font-size: 12px;
+  color: #909399;
+}
+.cmd-hints-list {
+  flex: 1;
+  max-height: 560px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.hint-header {
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #409eff;
+}
+.hint-line {
+  padding: 3px 12px;
+  font-size: 12px;
+  font-family: Menlo, Consolas, "Courier New", monospace;
+  color: #606266;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hint-line:hover {
+  color: #409eff;
+  background-color: #ecf5ff;
+}
+
+/* 实时流量 */
+.flow-tip {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #606266;
+}
+.flow-tip i {
+  margin-right: 4px;
+  color: #409eff;
+}
+.flow-tip b {
+  color: #f56c6c;
+}
+.flow-charts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.flow-chart {
+  padding: 8px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+}
 </style>
