@@ -78,7 +78,7 @@
             post_data[k] = v[k]
           }
         })
-        return collector_api.getPorts_ex(post_data, {})
+        return collector_api.getPortInfo(post_data, {})
       },
     },
   }

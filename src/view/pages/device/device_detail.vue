@@ -23,6 +23,7 @@
         <div class="dev-actions">
           <el-button size="small" icon="el-icon-refresh" :disabled="!device_info.ip" @click="refresh">刷新</el-button>
           <el-button size="small" icon="el-icon-share" :loading="isload1" :disabled="!device_info.ip" @click="showtopo()">相关设备</el-button>
+          <el-button size="small" icon="el-icon-copy-document" :disabled="!device_info.ip" @click="openConfigCompare">配置对比</el-button>
           <el-button size="small" icon="el-icon-edit-outline" :disabled="!device_info.ip" @click="diy_exec">自定义查询</el-button>
           <el-button size="small" type="primary" icon="el-icon-monitor" :disabled="!device_info.ip" @click="showXterm">远程连接</el-button>
         </div>
@@ -212,15 +213,107 @@
       </div>
     </el-dialog>
 
-    <el-dialog :title="'相关设备 - ' + (device_info.sysname || '')" :visible.sync="dialog_topo" width="80%">
-      <topo_div
-        v-bind:toponame="'test'"
-        v-bind:position="topo_position"
-        v-bind:node_list="topo_nodes"
-        v-bind:link_list="topo_links"
-        v-bind:chartswidth="'1200px'"
-        v-bind:chartsheight="'800px'"
-      ></topo_div>
+    <el-dialog
+      :title="'相关设备 - ' + (device_info.sysname || '')"
+      :visible.sync="dialog_topo"
+      width="90%"
+      top="5vh"
+      custom-class="topo-dialog"
+      :close-on-click-modal="false">
+      <div class="topo-container">
+        <!-- 拓扑画布区域 -->
+        <div class="topo-canvas-area" :class="{ 'has-card': topoDeviceCardVisible }" @contextmenu.capture.prevent="recordTopoMousePos">
+          <div class="topo-canvas-inner">
+            <topo_div
+              ref="topoCanvas"
+              v-bind:toponame="'test'"
+              v-bind:position="topo_position"
+              v-bind:node_list="topo_nodes"
+              v-bind:link_list="topo_links"
+              :chartswidth="topoCanvasWidth"
+              :chartsheight="topoCanvasHeight"
+              @rightclick="handleTopoRightClick"
+            ></topo_div>
+          </div>
+
+          <!-- 右键菜单 -->
+          <div
+            v-show="topoContextMenuVisible"
+            class="context-menu"
+            :style="{ left: topoMenuX + 'px', top: topoMenuY + 'px' }"
+            @click.stop>
+            <template v-if="topoContextMenuTarget && topoContextMenuTarget.click_type === 'node'">
+              <div class="menu-head"><i class="el-icon-cpu"></i>{{ topoContextTargetName }}</div>
+              <div class="contextmenu__item" @click="handleTopoViewNodeDetail"><i class="el-icon-view"></i>查看详情</div>
+              <div class="contextmenu__item" @click="handleTopoFocusNode"><i class="el-icon-aim"></i>聚焦节点</div>
+            </template>
+            <template v-else-if="topoContextMenuTarget && topoContextMenuTarget.click_type === 'link'">
+              <div class="menu-head"><i class="el-icon-connection"></i>{{ topoContextTargetName }}</div>
+              <div class="contextmenu__item" @click="handleTopoViewLinkDetail"><i class="el-icon-view"></i>链路详情</div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 设备详情卡片 - 始终存在，通过宽度控制显示隐藏 -->
+        <div class="device-detail-card" :class="{ 'card-visible': topoDeviceCardVisible }">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="el-icon-monitor"></i>
+              <span>{{ topoDeviceCardData.sysname || '设备详情' }}</span>
+            </div>
+            <i class="el-icon-close card-close" @click="topoDeviceCardVisible = false"></i>
+          </div>
+          <div class="card-body" v-loading="topoDeviceCardLoading">
+            <template v-if="!topoDeviceCardLoading && topoDeviceCardData.ip">
+              <div class="info-section">
+                <div class="section-title">基本信息</div>
+                <div class="card-item">
+                  <span class="card-label"><i class="el-icon-place"></i>IP 地址</span>
+                  <div class="card-value-group">
+                    <span class="card-value mono">{{ topoDeviceCardData.ip }}</span>
+                    <i class="el-icon-document-copy copy-icon" @click="copyText(topoDeviceCardData.ip)" title="复制"></i>
+                  </div>
+                </div>
+                <div class="card-item">
+                  <span class="card-label"><i class="el-icon-cpu"></i>设备名称</span>
+                  <span class="card-value">{{ topoDeviceCardData.sysname || '-' }}</span>
+                </div>
+                <div class="card-item full-width">
+                  <span class="card-label"><i class="el-icon-document"></i>设备描述</span>
+                  <div class="card-desc" :title="topoDeviceCardData.sysdesc">{{ topoDeviceCardData.sysdesc || '-' }}</div>
+                </div>
+                <div class="card-item">
+                  <span class="card-label"><i class="el-icon-time"></i>采集时间</span>
+                  <span class="card-value">{{ topoDeviceCardData.timestamp || '-' }}</span>
+                </div>
+              </div>
+
+              <!-- 统计信息 -->
+              <div class="info-section" v-if="topoDeviceCardLldpCount !== null">
+                <div class="section-title">连接统计</div>
+                <div class="stat-box">
+                  <div class="stat-item-mini">
+                    <i class="el-icon-connection stat-icon"></i>
+                    <div class="stat-content">
+                      <div class="stat-num">{{ topoDeviceCardLldpCount }}</div>
+                      <div class="stat-text">LLDP 邻居</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 操作按钮 -->
+              <div class="card-actions">
+                <el-button type="primary" size="small" icon="el-icon-top-right" @click="goToDeviceDetail">打开详情页</el-button>
+                <el-button size="small" icon="el-icon-aim" @click="focusCurrentNode" plain>聚焦节点</el-button>
+              </div>
+            </template>
+            <template v-else-if="!topoDeviceCardLoading">
+              <el-empty :image-size="80" description="未查询到设备信息"></el-empty>
+            </template>
+          </div>
+        </div>
+      </div>
     </el-dialog>
 
     <el-dialog :title="'自定义查询 - ' + (device_info.sysname || '') + ' ' + (device_info.ip || '')" :visible.sync="dialog_cmd_exec" width="75%">
@@ -287,6 +380,9 @@
         </div>
       </div>
     </el-dialog>
+
+    <!-- 配置对比抽屉 -->
+    <ConfigCompareDrawer :visible.sync="config_drawer_visible" :device-info="device_info" />
   </div>
 </template>
 
@@ -294,6 +390,7 @@
 import collector_api from "@/api/mapis/collector_interface.js"
 import topo_div from "@/components/topology/NetworkTopology.vue"
 import ssh_card from "./components/xterm_window.vue"
+import ConfigCompareDrawer from "./components/ConfigCompareDrawer.vue"
 
 import echart_flow from "@/components/echarts/echart_single_flow.vue"
 import echart_error from "@/components/echarts/echart_single_error.vue"
@@ -301,7 +398,7 @@ import echart_error from "@/components/echarts/echart_single_error.vue"
 
 export default {
   components:{
-    topo_div,echart_flow,echart_error, ssh_card
+    topo_div,echart_flow,echart_error, ssh_card, ConfigCompareDrawer
   },
   data () {
     return {
@@ -388,6 +485,27 @@ export default {
       flow_interval: 5,
 
       cli_load:false,
+
+      // 配置对比
+      config_drawer_visible: false,
+
+      // 拓扑右键菜单
+      topoContextMenuVisible: false,
+      topoContextMenuTarget: null,
+      topoMenuX: 0,
+      topoMenuY: 0,
+      topoLastMouse: null,
+
+      // 拓扑设备详情卡片
+      topoDeviceCardVisible: false,
+      topoDeviceCardLoading: false,
+      topoDeviceCardData: {},
+      topoDeviceCardNodeId: null,
+      topoDeviceCardLldpCount: null,
+
+      // 拓扑画布尺寸
+      topoCanvasWidth: '100%',
+      topoCanvasHeight: '700px',
     }
   },
   computed: {
@@ -419,6 +537,21 @@ export default {
         const m = line.match(/^[\x20-\x7e]+/)
         return {text: line, header: /^#/.test(line), cmd: m ? m[0].trim() : line.trim()}
       })
+    },
+    // 拓扑右键菜单标题
+    topoContextTargetName() {
+      const target = this.topoContextMenuTarget
+      if (!target || !target.detail) return ''
+      const id = typeof target.detail === 'object' ? target.detail.id : target.detail
+      if (target.click_type === 'node') {
+        const node = this.topo_nodes.find(n => n.id === id)
+        return node ? (node.label || node.id) : id
+      }
+      const edge = this.topo_links.find(e => e.id === id)
+      if (!edge) return id
+      const from = this.topo_nodes.find(n => n.id === edge.from)
+      const to = this.topo_nodes.find(n => n.id === edge.to)
+      return (from ? from.label : edge.from) + ' ↔ ' + (to ? to.label : edge.to)
     }
   },
   watch: {
@@ -966,8 +1099,166 @@ export default {
       document.body.removeChild(ta)
       done()
     },
-  }
 
+    openConfigCompare() {
+      this.config_drawer_visible = true
+    },
+
+    // 拓扑右键菜单相关方法
+    recordTopoMousePos(e) {
+      this.topoLastMouse = { x: e.clientX, y: e.clientY }
+      this.topoContextMenuVisible = false
+    },
+    handleTopoRightClick(data) {
+      this.topoContextMenuVisible = false
+      this.topoContextMenuTarget = data
+      this.$nextTick(() => {
+        const pos = this.topoLastMouse || { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+        this.topoMenuX = Math.min(pos.x, window.innerWidth - 170)
+        this.topoMenuY = Math.min(pos.y, window.innerHeight - 170)
+        this.topoContextMenuVisible = true
+      })
+    },
+    hideTopoContextMenu() {
+      this.topoContextMenuVisible = false
+      this.topoContextMenuTarget = null
+    },
+    handleTopoViewNodeDetail() {
+      if (!this.topoContextMenuTarget || !this.topoContextMenuTarget.detail) {
+        this.hideTopoContextMenu()
+        return
+      }
+      const nodeId = typeof this.topoContextMenuTarget.detail === 'object'
+        ? this.topoContextMenuTarget.detail.id
+        : this.topoContextMenuTarget.detail
+
+      this.topoDeviceCardNodeId = nodeId
+      this.topoDeviceCardVisible = true
+      this.topoDeviceCardLoading = true
+      this.topoDeviceCardData = {}
+      this.topoDeviceCardLldpCount = null
+
+      // 获取设备基本信息
+      collector_api.getDevs({"ip":"^"+nodeId+"$"},{}).then(response => {
+        if (response.data && response.data.code === 0) {
+          const devs = response.data.data || []
+          if (devs.length > 0) {
+            this.topoDeviceCardData = devs[0]
+          } else {
+            this.topoDeviceCardData = { ip: nodeId }
+          }
+        } else {
+          this.topoDeviceCardData = { ip: nodeId }
+        }
+        this.topoDeviceCardLoading = false
+      }).catch(error => {
+        console.error('查询设备信息失败:', error)
+        this.topoDeviceCardData = { ip: nodeId }
+        this.topoDeviceCardLoading = false
+      })
+
+      // 获取 LLDP 邻居数量
+      collector_api.getLLDPS({"loc_ip":"^"+nodeId+"$"},{}).then(response => {
+        if (response.data && response.data.code === 0) {
+          const lldps = response.data.data || []
+          this.topoDeviceCardLldpCount = lldps.length
+        }
+      }).catch(error => {
+        console.error('查询 LLDP 失败:', error)
+      })
+
+      this.hideTopoContextMenu()
+    },
+    goToDeviceDetail() {
+      if (this.topoDeviceCardNodeId) {
+        this.dialog_topo = false
+        this.$router.push({ path: '/pages/device/device_detail', query: { dev: this.topoDeviceCardNodeId } })
+      }
+    },
+    focusCurrentNode() {
+      if (this.topoDeviceCardNodeId && this.$refs.topoCanvas) {
+        this.$refs.topoCanvas.focus_node(this.topoDeviceCardNodeId)
+      }
+    },
+    handleTopoFocusNode() {
+      if (!this.topoContextMenuTarget || !this.topoContextMenuTarget.detail) {
+        this.hideTopoContextMenu()
+        return
+      }
+      const nodeId = typeof this.topoContextMenuTarget.detail === 'object'
+        ? this.topoContextMenuTarget.detail.id
+        : this.topoContextMenuTarget.detail
+
+      if (this.$refs.topoCanvas) {
+        this.$refs.topoCanvas.focus_node(nodeId)
+      }
+      this.hideTopoContextMenu()
+    },
+    handleTopoViewLinkDetail() {
+      if (!this.topoContextMenuTarget || !this.topoContextMenuTarget.detail) {
+        this.hideTopoContextMenu()
+        return
+      }
+
+      // detail 就是 edge 的 id 字符串
+      const edgeId = this.topoContextMenuTarget.detail
+
+      // 找到对应的连接（id 可能是 "10.143.224.12@10.143.224.11" 这样的格式）
+      let edge = this.topo_links.find(e => e.id === edgeId)
+
+      // 如果没找到，尝试通过 from 和 to 查找（可能是 vis.js 生成的边）
+      if (!edge) {
+        // edgeId 格式可能是 "from@to"
+        const parts = String(edgeId).split('@')
+        if (parts.length === 2) {
+          const [from, to] = parts
+          edge = this.topo_links.find(e =>
+            (e.from === from && e.to === to) || (e.from === to && e.to === from)
+          )
+        }
+      }
+
+      if (!edge) {
+        this.$message.warning('未找到链路详情，可能是外部设备连接')
+        console.log('查找失败，edgeId:', edgeId)
+        console.log('现有 links:', this.topo_links.map(e => ({id: e.id, from: e.from, to: e.to})))
+        this.hideTopoContextMenu()
+        return
+      }
+
+      // 显示链路详情（端口信息）
+      const fromNode = this.topo_nodes.find(n => n.id === edge.from)
+      const toNode = this.topo_nodes.find(n => n.id === edge.to)
+
+      const fromName = fromNode ? fromNode.label : edge.from
+      const toName = toNode ? toNode.label : edge.to
+
+      let linkInfo = `链路详情\n\n`
+      linkInfo += `源设备: ${fromName}\n`
+      linkInfo += `目标设备: ${toName}\n\n`
+
+      // 如果有详细的端口信息（从 lldp_data 中获取）
+      const targetIp = edge.to // 邻居设备的 IP
+      if (this.lldp_data[targetIp] && this.lldp_data[targetIp].ports) {
+        const ports = this.lldp_data[targetIp].ports
+        linkInfo += `链路端口 (共 ${ports.length} 条):\n`
+        ports.forEach((p, i) => {
+          linkInfo += `  ${i + 1}. ${this.device_info.sysname || '本地'} ${p.local} → ${this.lldp_data[targetIp].name || '远端'} ${p.remote}\n`
+        })
+      } else {
+        linkInfo += `端口信息: ${edge.label || '未知'}\n`
+      }
+
+      this.dialog_show('链路详情', linkInfo, '50%', 18)
+      this.hideTopoContextMenu()
+    }
+  },
+  created() {
+    document.addEventListener('click', this.hideTopoContextMenu)
+  },
+  beforeDestroy() {
+    document.removeEventListener('click', this.hideTopoContextMenu)
+  }
 }
 </script>
 
@@ -1336,4 +1627,279 @@ export default {
   border: 1px solid #ebeef5;
   border-radius: 6px;
 }
+
+/* 拓扑对话框布局 */
+.topo-dialog /deep/ .el-dialog {
+  margin: 0 !important;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+.topo-dialog /deep/ .el-dialog__header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+.topo-dialog /deep/ .el-dialog__body {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+}
+.topo-container {
+  display: flex;
+  width: 100%;
+  height: 700px;
+  background: #fafbfc;
+  overflow: hidden;
+}
+.topo-canvas-area {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  border-right: 1px solid #e3e8ee;
+  background: #fff;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+.topo-canvas-inner {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.topo-canvas-inner .mynetwork {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  box-sizing: border-box;
+}
+
+/* 设备详情卡片 */
+.device-detail-card {
+  width: 0;
+  flex-shrink: 0;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  transition: width 0.3s ease;
+}
+.device-detail-card.card-visible {
+  width: 340px;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid #ebeef5;
+  background: linear-gradient(135deg, #f0f7ff 0%, #fafcff 100%);
+}
+.card-title {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2d3d;
+}
+.card-title i {
+  margin-right: 8px;
+  font-size: 17px;
+  color: #409eff;
+}
+.card-close {
+  font-size: 18px;
+  color: #909399;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 2px;
+}
+.card-close:hover {
+  color: #f56c6c;
+  transform: scale(1.1);
+}
+.card-body {
+  flex: 1;
+  padding: 16px 18px 18px;
+  overflow-y: auto;
+}
+
+/* 信息分组 */
+.info-section {
+  margin-bottom: 20px;
+}
+.info-section:last-of-type {
+  margin-bottom: 16px;
+}
+.section-title {
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  display: flex;
+  align-items: center;
+}
+.section-title::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  background: #409eff;
+  border-radius: 2px;
+  margin-right: 6px;
+}
+
+/* 卡片项 */
+.card-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 22px;
+}
+.card-item.full-width {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.card-label {
+  min-width: 80px;
+  flex-shrink: 0;
+  color: #909399;
+  display: flex;
+  align-items: center;
+}
+.card-label i {
+  margin-right: 4px;
+  font-size: 14px;
+}
+.card-value-group {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+.card-value {
+  flex: 1;
+  min-width: 0;
+  color: #303133;
+  word-break: break-all;
+}
+.card-desc {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #606266;
+  width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+.copy-icon {
+  margin-left: 8px;
+  color: #409eff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.copy-icon:hover {
+  color: #66b1ff;
+  transform: scale(1.15);
+}
+
+/* 统计卡片 */
+.stat-box {
+  display: flex;
+  gap: 10px;
+}
+.stat-item-mini {
+  flex: 1;
+  padding: 12px;
+  background: linear-gradient(135deg, #ecf5ff 0%, #f5f9ff 100%);
+  border: 1px solid #d9ecff;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+}
+.stat-icon {
+  font-size: 28px;
+  color: #409eff;
+  margin-right: 12px;
+}
+.stat-content {
+  flex: 1;
+}
+.stat-num {
+  font-size: 20px;
+  font-weight: 600;
+  color: #409eff;
+  line-height: 1.2;
+}
+.stat-text {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 操作按钮 */
+.card-actions {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card-actions .el-button {
+  width: 100%;
+  margin: 0 !important;
+}
+
+/* 卡片滑入动画 - 已移除transition，使用CSS控制 */
+
+/* 右键菜单 */
+.context-menu {
+  position: fixed;
+  z-index: 3000;
+  min-width: 150px;
+  max-width: 260px;
+  padding: 4px 0;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+.menu-head {
+  padding: 4px 14px 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #909399;
+  border-bottom: 1px solid #ebeef5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu-head i {
+  margin-right: 4px;
+}
+.contextmenu__item {
+  padding: 0 14px;
+  line-height: 32px;
+  font-size: 13px;
+  color: #606266;
+  cursor: pointer;
+}
+.contextmenu__item i {
+  margin-right: 8px;
+}
+.contextmenu__item:hover {
+  color: #409eff;
+  background: #ecf5ff;
+}
+.menu-divider {
+  margin: 4px 0;
+  border-top: 1px solid #ebeef5;
+}
+
 </style>

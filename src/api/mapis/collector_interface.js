@@ -23,6 +23,9 @@ export default {
   getPorts_ex (data, params) {
     return axios.post("/collector/getports_ex", data, params)
   },
+  getPortInfo (data, params) {
+    return axios.post("/collector/getportinfo", data, params)
+  },
   getLLDPS (data, params) {
     return axios.post("/collector/getlldps", data, params)
   },
@@ -41,6 +44,9 @@ export default {
   },
   getSNList (data, params) {
     return axios.post("/collector/getdevice_sn", data, params)
+  },
+  getDeviceSummary (data, params) {
+    return axios.post("/collector/device_summary", data, params)
   },
 
   //command相关数据
