@@ -16,7 +16,7 @@
         <ApStatusCard />
       </div>
       <div class="grid-col-1">
-        <RecentChangesCard :days="7" />
+        <RecentChangesCard :days="2" />
       </div>
       <div class="grid-col-1">
         <PendingOrdersCard />

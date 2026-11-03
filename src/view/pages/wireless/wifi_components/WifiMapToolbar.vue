@@ -61,15 +61,24 @@
       <el-option label="自动刷新：1 分钟" :value="60"></el-option>
     </el-select>
 
+    <!-- 信道规划参考：20~160 MHz 各频宽下的可选信道、DFS / 天气雷达标识 -->
+    <el-button size="mini" icon="el-icon-s-operation" @click="channelVisible = true">信道</el-button>
+
     <el-button size="mini" icon="el-icon-refresh" :loading="loading" @click="$emit('refresh')">刷新</el-button>
+
+    <ChannelPlanDialog :visible.sync="channelVisible" />
   </div>
 </template>
 
 <script>
+import ChannelPlanDialog from './ChannelPlanDialog.vue'
+
 const ALL = '__all__'
 
 export default {
   name: 'WifiMapToolbar',
+
+  components: { ChannelPlanDialog },
 
   props: {
     mapList: { type: Array, default: () => [] },   // [{building, maps:[{map_id, map_name, ...}]}]
@@ -87,6 +96,7 @@ export default {
       filter: 'all',
       searchValue: '',
       autoRefresh: 0,   // 默认关闭：不再定时拉取，只在手动点「刷新」时重取
+      channelVisible: false,
       now: Date.now()
     }
   },

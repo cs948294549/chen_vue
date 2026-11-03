@@ -3,7 +3,7 @@
     <div class="card-header">
       <div class="card-title">
         <i class="el-icon-refresh-left"></i>
-        最近配置变更
+        最近{{ days }} 天内配置变更
       </div>
       <el-button type="text" size="small" @click="navigateToDeviceList">
         查看全部 <i class="el-icon-arrow-right"></i>
@@ -59,7 +59,7 @@ export default {
   props: {
     days: {
       type: Number,
-      default: 7
+      default: 2
     }
   },
   data () {
