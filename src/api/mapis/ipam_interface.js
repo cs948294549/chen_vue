@@ -25,6 +25,23 @@ export default {
     return axios.post("/ipam/get_address_tree", data, params)
   },
 
+  // 网段树文件夹
+  getFolderList(data, params) {
+    return axios.post("/ipam/folder/list", data, params)
+  },
+  addFolder(data, params) {
+    return axios.post("/ipam/folder/add", data, params)
+  },
+  updateFolder(data, params) {
+    return axios.post("/ipam/folder/update", data, params)
+  },
+  deleteFolder(data, params) {
+    return axios.post("/ipam/folder/delete", data, params)
+  },
+  moveToFolder(data, params) {
+    return axios.post("/ipam/folder/move", data, params)
+  },
+
   // IP地址管理
   getIpamAddressList(data, params) {
     return axios.post("/ipam/get_ipam_address", data, params)

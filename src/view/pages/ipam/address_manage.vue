@@ -22,7 +22,14 @@
               size="medium"
               icon="el-icon-delete"
               @click="enterBatchDeleteMode">
-              批量删除
+              批量操作
+            </el-button>
+            <el-button
+              v-if="!batchDeleteMode"
+              size="medium"
+              icon="el-icon-folder"
+              @click="openFolderManage">
+              文件夹管理
             </el-button>
             <template v-if="batchDeleteMode">
               <el-button
@@ -32,6 +39,14 @@
                 @click="batchDeleteNetworks"
                 :disabled="selectedNetworks.length === 0">
                 删除选中 ({{ selectedNetworks.length }})
+              </el-button>
+              <el-button
+                type="primary"
+                size="medium"
+                icon="el-icon-folder-add"
+                @click="openMoveToFolder"
+                :disabled="selectedNetworks.length === 0">
+                移入文件夹
               </el-button>
               <el-button
                 size="medium"
@@ -79,7 +94,15 @@
               @check-change="handleCheckChange"
               :filter-node-method="filterNode">
               <span class="custom-tree-node" slot-scope="{ node, data }">
-                <span style="display: flex; align-items: center; width: 100%;">
+                <span v-if="data.is_group" style="display: flex; align-items: center; width: 100%;">
+                  <i :class="node.expanded ? 'el-icon-folder-opened' : 'el-icon-folder'"
+                     style="color: #409EFF; margin-right: 8px; font-size: 16px;"></i>
+                  <span style="flex: 1;">
+                    <span style="font-weight: 600; color: #409EFF;">{{ data.ip }}</span>
+                    <span style="margin-left: 8px; color: #909399; font-size: 12px;">{{ data.role }}</span>
+                  </span>
+                </span>
+                <span v-else style="display: flex; align-items: center; width: 100%;">
                   <i :class="data.children && data.children.length > 0 ? 'el-icon-folder' : 'el-icon-document'"
                      :style="{color: data.children && data.children.length > 0 ? '#E6A23C' : '#67C23A', marginRight: '8px', fontSize: '16px'}"></i>
                   <span style="flex: 1;">
@@ -374,7 +397,124 @@
           </div>
         </div>
       </div>
+
+      <!-- 文件夹详情 -->
+      <div v-if="click_folder_info" style="flex: 1; padding: 0 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 15px; background: linear-gradient(135deg, #409EFF 0%, #36CFC9 100%); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+          <div style="display: flex; align-items: center;">
+            <i class="el-icon-folder-opened" style="font-size: 24px; color: #FFF; margin-right: 12px;"></i>
+            <span style="font-size: 18px; font-weight: 600; color: #FFF;">{{ click_folder_info.ip }}</span>
+            <el-tag size="small" style="margin-left: 12px;" type="info">{{ click_folder_info.children.length }} 个网段</el-tag>
+            <el-tag size="small" style="margin-left: 8px;" type="success">
+              整体使用率: {{ click_folder_info.used_per }}% ({{ click_folder_info.used_count }}/{{ click_folder_info.total_ips }})
+            </el-tag>
+          </div>
+          <div>
+            <el-button type="warning" size="small" icon="el-icon-edit" @click="openFolderForm(click_folder_info)">修改</el-button>
+            <el-button type="danger" size="small" icon="el-icon-delete" @click="deleteFolder(click_folder_info)">删除文件夹</el-button>
+          </div>
+        </div>
+        <div v-if="click_folder_info.comment" style="margin-bottom: 15px; color: #606266; font-size: 13px;">
+          <i class="el-icon-document"></i> {{ click_folder_info.comment }}
+        </div>
+
+        <el-card shadow="hover">
+          <div slot="header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center;">
+              <i class="el-icon-s-grid" style="margin-right: 8px; color: #409EFF; font-size: 18px;"></i>
+              <span style="font-weight: 600; font-size: 16px;">文件夹内网段</span>
+            </div>
+            <el-button type="danger" size="small" icon="el-icon-remove-outline"
+                       :disabled="folderSelected.length === 0"
+                       @click="removeFromFolder(folderSelected)">
+              批量移出 ({{ folderSelected.length }})
+            </el-button>
+          </div>
+          <el-table
+            :data="click_folder_info.children"
+            border
+            stripe
+            size="small"
+            max-height="650"
+            @selection-change="v => folderSelected = v"
+            :header-cell-style="{background: '#F5F7FA', color: '#606266', fontWeight: '600'}">
+            <el-table-column type="selection" width="45"></el-table-column>
+            <el-table-column label="网段" min-width="150">
+              <template slot-scope="s">
+                <span style="color: #409EFF; font-weight: 600;">{{ s.row.ip }}/{{ s.row.mask }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template slot-scope="s">{{ address_status_options[s.row.status] || '-' }}</template>
+            </el-table-column>
+            <el-table-column prop="location" label="区域" min-width="100"></el-table-column>
+            <el-table-column prop="isp" label="运营商" width="100"></el-table-column>
+            <el-table-column prop="role" label="用途" min-width="100"></el-table-column>
+            <el-table-column prop="used_per" label="使用率(%)" width="100"></el-table-column>
+            <el-table-column label="操作" width="130" align="center">
+              <template slot-scope="s">
+                <el-button type="text" size="mini" @click="locateFromFolder(s.row)">定位</el-button>
+                <el-button type="text" size="mini" style="color: #F56C6C;" @click="removeFromFolder([s.row])">移出</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </div>
     </div>
+
+    <!-- 文件夹管理对话框 -->
+    <el-dialog title="文件夹管理" :visible.sync="dialog_folder_manage" width="50%">
+      <div style="margin-bottom: 10px; text-align: right;">
+        <el-button type="primary" size="small" icon="el-icon-plus" @click="openFolderForm(null)">新建文件夹</el-button>
+      </div>
+      <el-table :data="folder_list" border size="small"
+                :header-cell-style="{background: '#F5F7FA', color: '#606266', fontWeight: '600'}">
+        <el-table-column prop="name" label="名称" min-width="140"></el-table-column>
+        <el-table-column prop="sort" label="排序" width="80" align="center"></el-table-column>
+        <el-table-column prop="comment" label="描述" min-width="160"></el-table-column>
+        <el-table-column label="操作" width="140" align="center">
+          <template slot-scope="s">
+            <el-button type="text" size="mini" @click="openFolderForm(s.row)">修改</el-button>
+            <el-button type="text" size="mini" style="color: #F56C6C;" @click="deleteFolder(s.row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
+    <!-- 新建/修改文件夹对话框 -->
+    <el-dialog :title="folder_form.id ? '修改文件夹' : '新建文件夹'" :visible.sync="dialog_folder_form" width="35%" append-to-body>
+      <el-form :model="folder_form" size="small" label-width="80px">
+        <el-form-item label="名称">
+          <el-input v-model="folder_form.name" placeholder="例如: 公网互联地址" maxlength="64" clearable></el-input>
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="folder_form.sort" :min="0" :max="9999"></el-input-number>
+          <span style="margin-left: 8px; color: #909399; font-size: 12px;">越小越靠前</span>
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input type="textarea" :rows="2" resize="none" v-model="folder_form.comment" maxlength="300"></el-input>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="submitFolderForm">确认</el-button>
+          <el-button @click="dialog_folder_form=false">取消</el-button>
+        </el-form-item>
+      </el-form>
+    </el-dialog>
+
+    <!-- 移入文件夹对话框 -->
+    <el-dialog title="移入文件夹" :visible.sync="dialog_move_folder" width="35%">
+      <div style="margin-bottom: 15px; font-size: 13px; color: #606266;">
+        将移入 <strong>{{ move_folder_nets.length }}</strong> 个最外层网段
+        <span v-if="move_folder_skip > 0" style="color: #E6A23C;">（已忽略 {{ move_folder_skip }} 个非最外层网段）</span>
+      </div>
+      <el-select v-model="move_folder_target" placeholder="选择目标文件夹" style="width: 100%;" filterable>
+        <el-option v-for="f in folder_list" :key="f.id" :label="f.name" :value="f.id"></el-option>
+      </el-select>
+      <div style="margin-top: 20px; text-align: right;">
+        <el-button @click="dialog_move_folder=false">取消</el-button>
+        <el-button type="primary" :disabled="!move_folder_target" @click="submitMoveToFolder">确认</el-button>
+      </div>
+    </el-dialog>
 
     <!-- 新增网段对话框 -->
     <el-dialog title="新增网段" :visible.sync="dialog_view_cfg" width="50%">
@@ -743,7 +883,19 @@ export default {
 
       // 批量删除网段
       selectedNetworks: [],
-      batchDeleteMode: false
+      batchDeleteMode: false,
+
+      // 网段树文件夹
+      click_folder_info: null,   // 当前点击的文件夹
+      folderSelected: [],
+      folder_list: [],
+      dialog_folder_manage: false,
+      dialog_folder_form: false,
+      folder_form: {},
+      dialog_move_folder: false,
+      move_folder_target: null,
+      move_folder_nets: [],
+      move_folder_skip: 0
     }
   },
 
@@ -797,6 +949,15 @@ export default {
       const findNodeByIp = (nodes, parentPath = []) => {
         for (let node of nodes) {
           const nodePath = [...parentPath, node.id]
+
+          // 文件夹没有地址范围，直接往下层找
+          if (node.is_group) {
+            const groupResult = findNodeByIp(node.children || [], nodePath)
+            if (groupResult) {
+              return groupResult
+            }
+            continue
+          }
 
           // start_ip和end_ip是字符串类型的整数，需要转换为数字进行比较
           const nodeStartIp = Number(node.start_ip)
@@ -856,8 +1017,19 @@ export default {
     },
 
     // 点击树节点
-    show_node(node) {
+    show_node(node, treeNode) {
       console.log("点击了====", node)
+      if (node.is_group) {
+        // 文件夹：清掉网段详情，右侧展示文件夹内网段
+        this.click_node_info = {}
+        this.click_folder_info = node
+        this.folderSelected = []
+        if (treeNode) {
+          treeNode.expanded = true
+        }
+        return
+      }
+      this.click_folder_info = null
       this.click_node_info = node
       this.filter_address_flag = false
       let that = this
@@ -986,6 +1158,12 @@ export default {
         if (response.data.code === 0) {
           that.net_data = response.data.data || []
           // console.log('设置数据，条数:', that.net_data.length)
+          // 刷新后重新指向当前文件夹，文件夹已不存在则关闭详情
+          if (that.click_folder_info) {
+            const folderId = that.click_folder_info.id
+            that.click_folder_info = that.net_data.find(n => n.is_group && n.id === folderId) || null
+            that.folderSelected = []
+          }
         } else {
           that.$message({
             type: 'error',
@@ -1610,7 +1788,7 @@ export default {
       this.selectedNetworks = []
       this.$message({
         type: 'info',
-        message: '请在左侧网段树中勾选要删除的网段'
+        message: '请在左侧网段树中勾选网段，可删除或移入文件夹'
       })
     },
 
@@ -1626,8 +1804,186 @@ export default {
     // 处理树节点勾选变化
     handleCheckChange() {
       if (this.$refs.ipTree) {
-        this.selectedNetworks = this.$refs.ipTree.getCheckedNodes()
+        // 文件夹是虚拟节点，不参与删除/移动
+        this.selectedNetworks = this.$refs.ipTree.getCheckedNodes().filter(n => !n.is_group)
       }
+    },
+
+    // ==================== 网段树文件夹 ====================
+
+    // 查询文件夹列表
+    getFolderList() {
+      let that = this
+      return ipam_api.getFolderList({}, {}).then(function(response) {
+        if (response.data.code === 0) {
+          that.folder_list = response.data.data || []
+        } else {
+          that.$message({ type: 'error', message: '查询文件夹失败' })
+        }
+      }).catch(function(error) {
+        console.log(error)
+        that.$message({ type: 'error', message: '查询文件夹失败' })
+      })
+    },
+
+    // 打开文件夹管理
+    openFolderManage() {
+      this.dialog_folder_manage = true
+      this.getFolderList()
+    },
+
+    // 打开新建/修改文件夹表单，folder 可以是文件夹列表行，也可以是树上的文件夹节点
+    openFolderForm(folder) {
+      if (folder) {
+        this.folder_form = {
+          id: folder.is_group ? folder.folder_id : folder.id,
+          name: folder.is_group ? folder.ip : folder.name,
+          sort: Number(folder.sort) || 0,
+          comment: folder.comment || ''
+        }
+      } else {
+        this.folder_form = { name: '', sort: 0, comment: '' }
+      }
+      this.dialog_folder_form = true
+    },
+
+    // 提交新建/修改文件夹
+    submitFolderForm() {
+      if (!this.folder_form.name || !this.folder_form.name.trim()) {
+        this.$message({ type: 'warning', message: '请输入文件夹名称' })
+        return
+      }
+      const post_data = {
+        name: this.folder_form.name.trim(),
+        sort: this.folder_form.sort || 0,
+        comment: this.folder_form.comment || ''
+      }
+      let request
+      if (this.folder_form.id) {
+        post_data.id = this.folder_form.id
+        request = ipam_api.updateFolder(post_data, {})
+      } else {
+        request = ipam_api.addFolder(post_data, {})
+      }
+
+      let that = this
+      request.then(function(response) {
+        if (response.data.code === 0) {
+          that.$message({ type: 'success', message: response.data.message || '操作成功' })
+          that.dialog_folder_form = false
+          that.getFolderList()
+          that.getTreeNode()
+        } else {
+          that.$message({ type: 'error', message: response.data.message || '操作失败' })
+        }
+      }).catch(function(error) {
+        console.log(error)
+        that.$message({ type: 'error', message: '操作失败，请重试' })
+      })
+    },
+
+    // 删除文件夹（网段本身不删除，会回到最外层）
+    deleteFolder(folder) {
+      const folderId = folder.is_group ? folder.folder_id : folder.id
+      const folderName = folder.is_group ? folder.ip : folder.name
+      this.$confirm(`确认删除文件夹「${folderName}」吗？文件夹内的网段不会被删除，将回到最外层。`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        let that = this
+        ipam_api.deleteFolder({ id: folderId }, {}).then(function(response) {
+          if (response.data.code === 0) {
+            that.$message({ type: 'success', message: '删除成功' })
+            that.getFolderList()
+            that.getTreeNode()
+          } else {
+            that.$message({ type: 'error', message: '删除失败，请重试' })
+          }
+        }).catch(function(error) {
+          console.log(error)
+          that.$message({ type: 'error', message: '删除失败，请重试' })
+        })
+      }).catch(() => {})
+    },
+
+    // 打开移入文件夹对话框：只放行最外层网段（树的第一层，或已在某个文件夹下的网段）
+    openMoveToFolder() {
+      const tree = this.$refs.ipTree
+      const nets = []
+      let skip = 0
+      this.selectedNetworks.forEach(item => {
+        const treeNode = tree.getNode(item.id)
+        const isTop = treeNode && (treeNode.level === 1 || (treeNode.parent && treeNode.parent.data && treeNode.parent.data.is_group))
+        if (isTop) {
+          nets.push(item)
+        } else {
+          skip++
+        }
+      })
+      if (nets.length === 0) {
+        this.$message({ type: 'warning', message: '只能移动最外层网段，当前勾选中没有最外层网段' })
+        return
+      }
+      this.move_folder_nets = nets
+      this.move_folder_skip = skip
+      this.move_folder_target = null
+      this.dialog_move_folder = true
+      this.getFolderList()
+    },
+
+    // 提交移入文件夹
+    submitMoveToFolder() {
+      const post_data = {
+        folder_id: this.move_folder_target,
+        nets: this.move_folder_nets.map(n => ({ ip: n.ip, mask: n.mask }))
+      }
+      let that = this
+      ipam_api.moveToFolder(post_data, {}).then(function(response) {
+        if (response.data.code === 0) {
+          that.$message({ type: 'success', message: `已移入 ${post_data.nets.length} 个网段` })
+          that.dialog_move_folder = false
+          that.exitBatchDeleteMode()
+          that.getTreeNode()
+        } else {
+          that.$message({ type: 'error', message: '移入失败，请重试' })
+        }
+      }).catch(function(error) {
+        console.log(error)
+        that.$message({ type: 'error', message: '移入失败，请重试' })
+      })
+    },
+
+    // 从文件夹移出
+    removeFromFolder(rows) {
+      if (!rows || rows.length === 0) {
+        return
+      }
+      const post_data = { folder_id: "", nets: rows.map(r => ({ ip: r.ip, mask: r.mask })) }
+      let that = this
+      ipam_api.moveToFolder(post_data, {}).then(function(response) {
+        if (response.data.code === 0) {
+          that.$message({ type: 'success', message: `已移出 ${rows.length} 个网段` })
+          that.getTreeNode()
+        } else {
+          that.$message({ type: 'error', message: '移出失败，请重试' })
+        }
+      }).catch(function(error) {
+        console.log(error)
+        that.$message({ type: 'error', message: '移出失败，请重试' })
+      })
+    },
+
+    // 从文件夹表格定位到树中的网段
+    locateFromFolder(row) {
+      const tree = this.$refs.ipTree
+      if (this.click_folder_info) {
+        this.default_expand = [this.click_folder_info.id]
+      }
+      this.$nextTick(() => {
+        tree.setCurrentKey(row.id)
+        this.show_node(row, tree.getNode(row.id))
+      })
     },
 
     // 批量删除网段
