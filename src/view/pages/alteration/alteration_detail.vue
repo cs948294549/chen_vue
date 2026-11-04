@@ -102,8 +102,8 @@
           </div>
           <div class="log-wrapper">
             <div v-if="logList.length > 0" class="log-list">
-              <div v-for="(log, index) in logList" :key="index" class="log-item">
-                <div class="log-time">{{ formatTime(log.create_time) }}</div>
+              <div v-for="(log, index) in logList" :key="log.pid || index" class="log-item">
+                <div class="log-time">{{ formatTime(log.timestamp || log.create_time) }}</div>
                 <div class="log-content">
                   <span :class="['log_tag', getLogTagClass(log.tag)]" v-if="log.tag">
                     {{ getLogTagText(log.tag) }}
@@ -114,6 +114,22 @@
               </div>
             </div>
             <div v-else class="empty-text">暂无操作记录</div>
+          </div>
+          <!-- 评论输入 -->
+          <div class="log-editor">
+            <el-input
+              v-model="commentText"
+              type="textarea"
+              :rows="3"
+              maxlength="500"
+              show-word-limit
+              resize="none"
+              placeholder="输入评论，Ctrl + Enter 快速发送"
+              @keydown.native.ctrl.enter="handleComment">
+            </el-input>
+            <div class="log-editor-footer">
+              <el-button type="primary" size="small" icon="el-icon-chat-dot-round" :loading="commenting" @click="handleComment">发送评论</el-button>
+            </div>
           </div>
         </div>
       </div>
@@ -362,6 +378,10 @@ export default {
 
       // 日志列表
       logList: [],
+
+      // 评论
+      commentText: '',
+      commenting: false,
 
       // 当前激活的设备Tab
       activeDeviceTab: '',
@@ -720,6 +740,32 @@ export default {
       })
     },
 
+    // 发送评论
+    handleComment() {
+      const msg = (this.commentText || '').trim()
+      if (!msg) {
+        this.$message.warning('请输入评论内容')
+        return
+      }
+      if (this.commenting) return
+
+      this.commenting = true
+      alterationApi.addLog({ op_id: this.opId, msg: msg }).then(response => {
+        if (response.data.code === 0) {
+          this.$message.success('评论已提交')
+          this.commentText = ''
+          this.loadLogList()
+        } else {
+          this.$message.error(response.data.message || '评论失败')
+        }
+        this.commenting = false
+      }).catch(error => {
+        console.error('提交评论失败:', error)
+        this.$message.error('评论失败')
+        this.commenting = false
+      })
+    },
+
     // 获取工单类型名称
     getTypeName(typeId) {
       const type = this.typeList.find(t => t.pid === typeId)
@@ -780,7 +826,8 @@ export default {
         '06': 'cm_tag4',
         '07': 'cm_tag5',
         '08': 'cm_tag6',
-        '09': 'cm_tag1'
+        '09': 'cm_tag1',
+        '11': 'cm_tag7'
       }
       return classMap[tag] || ''
     },
@@ -796,7 +843,8 @@ export default {
         '06': '审批拒绝',
         '07': '开始变更',
         '08': '变更完成',
-        '09': '取消工单'
+        '09': '取消工单',
+        '11': '评论'
       }
       return textMap[tag] || ''
     },
@@ -942,7 +990,7 @@ export default {
         const deviceIds = executableDevices.map(d => d.pid)
         alterationApi.executeBatch({ op_id: this.opId, device_ids: deviceIds }).then(response => {
           if (response.data.code === 0) {
-            this.$message.success(`批次 ${batch.batch} 开始执行（${executableCount}台设备）`)
+            this.$message.success(`批次 ${batch.batch} 执行完成（${executableCount}台设备）`)
             this.loadDeviceList()
             this.loadLogList()
           } else {
@@ -966,7 +1014,7 @@ export default {
         this.executing = true
         alterationApi.executeDevice({ op_id: this.opId, device_id: device.pid }).then(response => {
           if (response.data.code === 0) {
-            this.$message.success(`设备 ${device.sysname} 开始执行`)
+            this.$message.success(`设备 ${device.sysname} 执行完成`)
             this.loadDeviceList()
             this.loadLogList()
           } else {
@@ -990,7 +1038,7 @@ export default {
         this.$set(this.rollingDevice, device.pid, true)
         alterationApi.rollbackDevice({ op_id: this.opId, device_id: device.pid }).then(response => {
           if (response.data.code === 0) {
-            this.$message.success(`设备 ${device.sysname} 开始回滚`)
+            this.$message.success(`设备 ${device.sysname} 回滚完成`)
             this.loadDeviceList()
             this.loadLogList()
           } else {
@@ -1445,6 +1493,25 @@ export default {
 .cm_tag4 { background: #fde2e2; color: #f56c6c; }
 .cm_tag5 { background: #fdf6ec; color: #e6a23c; }
 .cm_tag6 { background: #f4f4f5; color: #909399; }
+.cm_tag7 { background: #f0f9eb; color: #529b2e; }
+
+/* 评论输入 */
+.log-editor {
+  flex-shrink: 0;
+  padding: 12px 15px;
+  border-top: 1px solid #e4e7ed;
+  background: #fafafa;
+}
+
+.log-editor >>> .el-textarea__inner {
+  font-size: 13px;
+}
+
+.log-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
 
 .log-msg {
   font-size: 13px;

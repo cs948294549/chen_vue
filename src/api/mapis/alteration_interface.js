@@ -117,6 +117,9 @@ export default {
   getLogList(data, params) {
     return axios.post("/op/log/list", data, params)
   },
+  addLog(data, params) {
+    return axios.post("/op/log/add", data, params)
+  },
   getApprovalList(data, params) {
     return axios.post("/op/approval/list", data, params)
   }
