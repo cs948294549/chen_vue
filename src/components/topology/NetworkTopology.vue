@@ -1,6 +1,27 @@
 <template>
-	<div :id="toponame" class="mynetwork" :class="{ 'pick-mode': pickMode }" :style="{width:chartswidth,height:chartsheight}">
-		<!--用于画关系图的部分 :id="chartsname" :style="{width:chartswidth,height:chartsheight}"-->
+	<!-- 外层只负责尺寸与定位；vis 的画布单独放在 canvas 容器里，避免与 Vue 的节点操作互相干扰 -->
+	<div class="mynetwork" :class="{ 'pick-mode': pickMode }" :style="{width:chartswidth,height:chartsheight}">
+		<div :id="toponame" class="mynetwork-canvas"></div>
+		<!-- 搜索定位标记：只覆盖被定位的那一个节点，不改变其他节点的样式 -->
+		<div
+			v-if="focusBadge"
+			class="focus-ring"
+			:style="{
+				left: focusBadge.x + 'px',
+				top: focusBadge.y + 'px',
+				width: focusBadge.size + 'px',
+				height: focusBadge.size + 'px'
+			}">
+			<span class="fr-pulse"></span>
+		</div>
+		<div
+			v-if="focusBadge"
+			class="focus-badge"
+			:style="{ left: focusBadge.x + 'px', top: focusBadge.y + 'px', marginTop: -(focusBadge.size / 2) + 'px' }">
+			<i class="el-icon-aim"></i>
+			<span class="fb-text">{{ focusBadge.label }}</span>
+			<i class="el-icon-close fb-close" title="取消标记" @click.stop="clearFocusNode"></i>
+		</div>
 	</div>
 </template>
 
@@ -63,7 +84,12 @@
 				nodesDataSet: null,
 				edgesDataSet: null,
 				// 被固定选中的节点（连线模式下高亮起点），鼠标划过后不被清除
-				pinnedNodeId: null
+				pinnedNodeId: null,
+				// 搜索定位的节点ID，画布上保留明显标记直到手动取消
+				focusNodeId: null,
+				focusNodeLabel: '',
+				// 定位标记的位置与文案（画布像素坐标）
+				focusBadge: null
 			}
 		},
 		watch: {
@@ -151,6 +177,8 @@
 				// 保存network实例供外部调用
 				this.network = network
 				this.pinnedNodeId = null
+				this.focusNodeId = null
+				this.focusBadge = null
 
 				let postdev=list2dict(nodes)
 				let idlist=Object.keys(postdev);
@@ -227,6 +255,11 @@
           that.$emit("pick_node", postdev[click_node_id])
         });
 
+        //每次重绘后同步定位标记的位置（缩放、拖拽后跟随节点）
+        network.on("afterDrawing", function () {
+          that.updateFocusBadge()
+        });
+
 
 			},
 			saveNodePosition:function(position){
@@ -237,6 +270,73 @@
 				if (!this.network) return
 				this.pinnedNodeId = (ids && ids.length) ? ids[0] : null
 				this.network.selectNodes(ids || [])
+			},
+			//父组件调用：聚焦并高亮指定节点（搜索定位）
+			//定位后只在该节点外套一个红色脉冲光环 + 悬浮标签，直到手动关闭
+			focusNodeById(nodeId, label){
+				if (!this.network || !nodeId) return
+				this.clearFocusNode()
+				const options = {
+					scale: Math.max(this.network.getScale() || 1, 0.8),
+					animation: {
+						duration: 600,
+						easingFunction: 'easeInOutQuad'
+					}
+				}
+				this.focusNodeId = nodeId
+				this.focusNodeLabel = label || nodeId
+				this.network.selectNodes([nodeId])
+				this.network.focus(nodeId, options)
+				// 动画结束后节点才到视野中心，这里立即算一次，后面由 afterDrawing 持续跟随
+				this.updateFocusBadge()
+			},
+			//当前节点在画布上的像素位置与图标尺寸（用于绘制光环）
+			getFocusGeometry(){
+				if (!this.network || !this.focusNodeId) return null
+				const positions = this.network.getPositions([this.focusNodeId])
+				const pos = positions && positions[this.focusNodeId]
+				if (!pos) return null
+				const dom = this.network.canvasToDOM(pos)
+				if (!dom) return null
+				// 图片节点：实际边长 = size * 2，再按当前缩放换算成屏幕像素
+				let size = 50
+				const nodeBody = this.network.body && this.network.body.nodes && this.network.body.nodes[this.focusNodeId]
+				if (nodeBody) {
+					const shapeSize = nodeBody.shape && (nodeBody.shape.width || nodeBody.shape.height)
+					const optionSize = nodeBody.options && nodeBody.options.size
+					const base = shapeSize || (optionSize ? optionSize * 2 : 25 * 2)
+					size = base * (this.network.getScale() || 1)
+				}
+				// 略大于图标，让光环套在图标外侧，留出一点间距
+				size = Math.max(Math.round(size * 1.35), 34)
+				return { x: dom.x, y: dom.y, size: size }
+			},
+			//光环与标签跟随节点：缩放、拖动画布后重新计算画布像素坐标
+			updateFocusBadge(){
+				if (!this.network || !this.focusNodeId) {
+					if (this.focusBadge) this.focusBadge = null
+					return
+				}
+				const geo = this.getFocusGeometry()
+				if (!geo) {
+					if (this.focusBadge) this.focusBadge = null
+					return
+				}
+				const x = Math.round(geo.x)
+				const y = Math.round(geo.y)
+				const size = Math.round(geo.size)
+				const label = this.focusNodeLabel
+				const prev = this.focusBadge
+				if (prev && prev.x === x && prev.y === y && prev.size === size && prev.label === label) return
+				this.focusBadge = { x: x, y: y, size: size, label: label }
+			},
+			//父组件 / 标签关闭按钮调用：清除定位标记
+			clearFocusNode(){
+				if (!this.focusNodeId) return
+				this.focusNodeId = null
+				this.focusNodeLabel = ''
+				this.focusBadge = null
+				if (this.network) this.network.selectNodes([])
 			},
 			//父组件调用
 			focus_node(node_id){
@@ -262,10 +362,92 @@
 
 <style>
 	.mynetwork {
+		position: relative;
+		box-sizing: border-box;
 		border: 1px solid lightgray;
+	}
+	/* vis 的画布容器：铺满外层，定位标记叠在它上面 */
+	.mynetwork .mynetwork-canvas {
+		width: 100%;
+		height: 100%;
 	}
 	/* 连线模式：鼠标指向节点显示十字准星，明确可点击 */
 	.mynetwork.pick-mode canvas {
 		cursor: crosshair;
+	}
+	/* 搜索定位：套在被定位节点上的高亮圆环（只作用于这一个节点） */
+	.focus-ring {
+		position: absolute;
+		z-index: 15;
+		transform: translate(-50%, -50%);
+		border: 2px solid #f56c6c;
+		border-radius: 50%;
+		pointer-events: none;
+		animation: focus-ring-breathe 1.4s ease-in-out infinite;
+	}
+	/* 外扩的一圈脉冲，进一步吸引注意 */
+	.focus-ring .fr-pulse {
+		position: absolute;
+		top: -2px;
+		left: -2px;
+		right: -2px;
+		bottom: -2px;
+		border: 2px solid #f56c6c;
+		border-radius: 50%;
+		opacity: 0.7;
+		animation: focus-ring-pulse 1.4s ease-out infinite;
+	}
+	@keyframes focus-ring-breathe {
+		0%, 100% { box-shadow: 0 0 0 0 rgba(245, 108, 108, 0.55); }
+		50% { box-shadow: 0 0 0 6px rgba(245, 108, 108, 0.18); }
+	}
+	@keyframes focus-ring-pulse {
+		0% { transform: scale(1); opacity: 0.75; }
+		100% { transform: scale(1.9); opacity: 0; }
+	}
+	/* 搜索定位标记：节点上方的红色标签，指向被定位的节点 */
+	.focus-badge {
+		position: absolute;
+		z-index: 20;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		max-width: 260px;
+		padding: 3px 6px 3px 8px;
+		line-height: 18px;
+		font-size: 12px;
+		color: #fff;
+		white-space: nowrap;
+		background: #f56c6c;
+		border-radius: 4px;
+		box-shadow: 0 2px 8px rgba(245, 108, 108, 0.45);
+		transform: translate(-50%, -100%) translateY(-8px);
+		/* 标签本身不拦截鼠标，只有关闭按钮可点，避免影响节点拖拽 */
+		pointer-events: none;
+	}
+	.focus-badge::after {
+		content: '';
+		position: absolute;
+		left: 50%;
+		bottom: -5px;
+		width: 0;
+		height: 0;
+		border-left: 5px solid transparent;
+		border-right: 5px solid transparent;
+		border-top: 5px solid #f56c6c;
+		transform: translateX(-50%);
+	}
+	.focus-badge .fb-text {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.focus-badge .fb-close {
+		cursor: pointer;
+		opacity: 0.8;
+		/* 父级关闭了鼠标穿透，这里单独打开，保证关闭按钮可点 */
+		pointer-events: auto;
+	}
+	.focus-badge .fb-close:hover {
+		opacity: 1;
 	}
 </style>

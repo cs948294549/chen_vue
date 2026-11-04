@@ -15,6 +15,27 @@
           <span><i class="el-icon-connection"></i>连接 <b>{{ edgesData.length }}</b></span>
         </div>
         <div class="eh-actions">
+          <div class="eh-search">
+            <el-autocomplete
+              v-model="nodeSearch"
+              size="small"
+              placeholder="搜索节点名称 / 设备名 / IP"
+              prefix-icon="el-icon-search"
+              clearable
+              :fetch-suggestions="queryNodeSearch"
+              :trigger-on-focus="false"
+              :highlight-first-item="true"
+              value-key="label"
+              @select="handleNodeSearchSelect">
+              <template slot-scope="{ item }">
+                <div class="search-item">
+                  <span class="si-label">{{ item.label }}</span>
+                  <span v-if="item.sysname && item.sysname !== item.label" class="si-sys">{{ item.sysname }}</span>
+                  <span class="si-ip">{{ item.id }}</span>
+                </div>
+              </template>
+            </el-autocomplete>
+          </div>
           <el-button-group>
             <el-button size="small" icon="el-icon-aim" @click="handleFocusCenter" title="聚焦画布">聚焦</el-button>
             <el-button size="small" icon="el-icon-circle-plus-outline" @click="handleAddNode">添加节点</el-button>
@@ -204,6 +225,9 @@ export default {
       // 图上连线模式
       linkMode: false,
       linkFrom: null, // 已选起点节点 {id, label}
+
+      // 节点搜索
+      nodeSearch: '',
 
       // 画布动态宽高
       canvasWidth: '1200px',
@@ -796,7 +820,45 @@ export default {
         })
     },
 
-    // ==================== 图上连线 ====================
+    // ==================== 节点搜索 ====================
+
+    // 按显示名称、设备名(sysname)、节点ID(IP) 模糊匹配，最多返回 12 条
+    queryNodeSearch(queryString, cb) {
+      const kw = (queryString || '').trim().toLowerCase()
+      if (!kw) {
+        cb([])
+        return
+      }
+      const hit = this.nodesData.filter(node => {
+        const label = node.label || ''
+        const sysname = (node.meta && node.meta.sysname) || ''
+        const id = node.id || ''
+        return label.toLowerCase().indexOf(kw) !== -1 ||
+          sysname.toLowerCase().indexOf(kw) !== -1 ||
+          id.toLowerCase().indexOf(kw) !== -1
+      })
+      cb(hit.slice(0, 12).map(node => ({
+        id: node.id,
+        label: node.label || node.id,
+        sysname: (node.meta && node.meta.sysname) || ''
+      })))
+    },
+
+    handleNodeSearchSelect(item) {
+      if (!item || !item.id) return
+      if (this.linkMode) {
+        this.exitLinkMode()
+      }
+      const node = this.findNodeData(item.id)
+      if (!node) {
+        this.$message.warning('节点不存在，可能已被删除')
+        return
+      }
+      if (this.$refs.topologyCanvas && this.$refs.topologyCanvas.focusNodeById) {
+        this.$refs.topologyCanvas.focusNodeById(node.id, node.label || node.id)
+      }
+    },
+
 
     toggleLinkMode() {
       if (this.linkMode) {
@@ -1050,6 +1112,53 @@ export default {
 }
 .eh-actions .el-button-group {
   margin-right: 10px;
+}
+/* 节点搜索 */
+.eh-search {
+  width: 230px;
+  margin-right: 10px;
+}
+.eh-search .el-autocomplete {
+  width: 100%;
+}
+.eh-search /deep/ .el-input__inner {
+  height: 32px;
+  line-height: 32px;
+  font-size: 13px;
+  border-radius: 4px;
+}
+.search-item {
+  display: flex;
+  align-items: center;
+  max-width: 420px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.si-label {
+  flex-shrink: 1;
+  min-width: 0;
+  color: #303133;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.si-sys {
+  flex-shrink: 1;
+  min-width: 0;
+  margin-left: 8px;
+  font-size: 12px;
+  color: #909399;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.si-ip {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 10px;
+  font-size: 12px;
+  color: #c0c4cc;
+  font-family: Menlo, Consolas, "Courier New", monospace;
 }
 .eh-meta {
   display: flex;
