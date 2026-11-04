@@ -308,6 +308,9 @@ export default {
     // 加载保存的筛选条件
     this.loadFilterFromStorage()
 
+    // 首页卡片跳转过来时带当日时间范围，覆盖本地保存的筛选
+    this.applyRouteQueryFilter()
+
     this.loadTypeList()
     this.loadNotifyList()
     this.loadOrderList()
@@ -319,6 +322,21 @@ export default {
   },
 
   methods: {
+    // 从路由 query 接管筛选条件（首页"当日工单"入口）
+    applyRouteQueryFilter() {
+      const q = this.$route.query || {}
+      if (!q.create_time_start || !q.create_time_end) return
+
+      this.filters.create_time_range = [
+        parseInt(q.create_time_start) * 1000,
+        parseInt(q.create_time_end) * 1000
+      ]
+      // 当日所有状态都要能看到，去掉默认的进行中状态筛选和"待我处理"
+      this.filters.status = []
+      this.filters.op_type = ''
+      this.filters.my_tasks = false
+    },
+
     // 从 localStorage 加载筛选条件
     loadFilterFromStorage() {
       try {

@@ -4,8 +4,9 @@
       <div class="card-title">
         <i class="el-icon-document-checked"></i>
         待处理工单
+        <span class="card-sub">{{ rangeLabel }} 工单</span>
       </div>
-      <el-button type="text" size="small" @click="$router.push('/pages/alteration/alteration_manage')">
+      <el-button type="text" size="small" @click="goToList">
         查看全部 <i class="el-icon-arrow-right"></i>
       </el-button>
     </div>
@@ -65,16 +66,20 @@ export default {
     return {
       loading: false,
       orders: [],
-      allOrders: []
+      allOrders: [],
+      rangeLabel: ''
     }
   },
   computed: {
+    // 按状态把近 7 天工单分类
     statList () {
       const counts = {
         draft: 0,
         pending: 0,
         approved: 0,
-        changing: 0
+        changing: 0,
+        finished: 0,
+        failed: 0
       }
       this.allOrders.forEach(o => {
         const s = o.status
@@ -82,12 +87,17 @@ export default {
         else if (s === '01' || s === '02') counts.pending++
         else if (s === '10' || s === '20') counts.approved++
         else if (s === '21') counts.changing++
+        else if (s === '90') counts.finished++
+        else if (s === '91' || s === '92' || s === '93') counts.failed++
       })
       return [
+        { key: 'total', label: '近7天总数', count: this.allOrders.length, type: 'total' },
         { key: 'draft', label: '草稿', count: counts.draft, type: 'info' },
         { key: 'pending', label: '待审批', count: counts.pending, type: 'warning' },
         { key: 'approved', label: '已通过', count: counts.approved, type: 'success' },
-        { key: 'changing', label: '变更中', count: counts.changing, type: 'primary' }
+        { key: 'changing', label: '变更中', count: counts.changing, type: 'primary' },
+        { key: 'finished', label: '已完成', count: counts.finished, type: 'done' },
+        { key: 'failed', label: '失败/取消', count: counts.failed, type: 'danger' }
       ]
     }
   },
@@ -95,9 +105,27 @@ export default {
     this.loadOrders()
   },
   methods: {
+    // 近 7 天（含今天）00:00:00 ~ 今天 23:59:59 的时间戳（秒）
+    getRange () {
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+      const pad = n => String(n).padStart(2, '0')
+      this.rangeLabel = `近7天(${pad(start.getMonth() + 1)}-${pad(start.getDate())} ~ ${pad(end.getMonth() + 1)}-${pad(end.getDate())})`
+      return {
+        start: String(Math.floor(start.getTime() / 1000)),
+        end: String(Math.floor(end.getTime() / 1000))
+      }
+    },
+
     loadOrders () {
       this.loading = true
-      const params = { status: ['00', '01', '02', '10', '20', '21'] }
+      const range = this.getRange()
+      // 先按创建时间搜索出近 7 天的全部工单（不限定状态），再在前端分类
+      const params = {
+        create_time_start: range.start,
+        create_time_end: range.end
+      }
       alterationApi.getOrderList(params, {}).then(res => {
         if (res.data && res.data.code === 0) {
           const list = res.data.data || []
@@ -109,7 +137,7 @@ export default {
         }
         this.loading = false
       }).catch(err => {
-        console.error('加载工单列表失败:', err)
+        console.error('加载近7天工单列表失败:', err)
         this.loading = false
       })
     },
@@ -144,6 +172,14 @@ export default {
         '93': 'info'
       }
       return map[status] || 'info'
+    },
+
+    goToList () {
+      const range = this.getRange()
+      this.$router.push({
+        path: '/pages/alteration/alteration_manage',
+        query: { create_time_start: range.start, create_time_end: range.end }
+      })
     },
 
     goToDetail (opId) {
@@ -182,6 +218,12 @@ export default {
   font-size: 18px;
   color: #409eff;
 }
+.card-sub {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #909399;
+}
 .stat-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
@@ -218,6 +260,12 @@ export default {
 .stat-success .stat-num { color: #67c23a; }
 .stat-primary { border-color: #b3d8ff; background: #ecf5ff; }
 .stat-primary .stat-num { color: #409eff; }
+.stat-total { border-color: #dcdfe6; background: #f4f4f5; }
+.stat-total .stat-num { color: #303133; }
+.stat-done { border-color: #c2e7b0; background: #f0f9eb; }
+.stat-done .stat-num { color: #67c23a; }
+.stat-danger { border-color: #fbc4c4; background: #fef0f0; }
+.stat-danger .stat-num { color: #f56c6c; }
 
 .empty-hint {
   text-align: center;

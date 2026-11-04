@@ -18,9 +18,8 @@
             </el-button>
             <el-button
               v-if="!batchDeleteMode"
-              type="warning"
               size="medium"
-              icon="el-icon-delete"
+              icon="el-icon-finished"
               @click="enterBatchDeleteMode">
               批量操作
             </el-button>
