@@ -18,7 +18,14 @@
           <el-button-group>
             <el-button size="small" icon="el-icon-aim" @click="handleFocusCenter" title="聚焦画布">聚焦</el-button>
             <el-button size="small" icon="el-icon-circle-plus-outline" @click="handleAddNode">添加节点</el-button>
-            <el-button size="small" icon="el-icon-connection" @click="handleAddLink">添加连接</el-button>
+            <el-button
+              size="small"
+              icon="el-icon-position"
+              :type="linkMode ? 'primary' : ''"
+              title="在画布上依次点击两个节点来添加连接"
+              @click="toggleLinkMode">
+              {{ linkMode ? '退出连线' : '添加连接' }}
+            </el-button>
           </el-button-group>
           <el-button type="primary" icon="el-icon-check" size="small" @click="handleSave" :loading="saving">保存</el-button>
         </div>
@@ -43,9 +50,26 @@
         :position="positions"
         :chartswidth="canvasWidth"
         :chartsheight="canvasHeight"
+        :pick-mode="linkMode"
         @savePosition="handleSavePosition"
+        @pick_node="handlePickNode"
         @rightclick="handleRightClick">
       </NetworkTopology>
+
+      <!-- 连线模式状态条 -->
+      <div v-if="linkMode" class="link-mode-bar">
+        <i class="el-icon-position"></i>
+        <template v-if="!linkFrom">
+          连线模式：请点击<b>起点节点</b>
+        </template>
+        <template v-else>
+          起点：<b>{{ linkFrom.label }}</b>（{{ linkFrom.id }}），请点击<b>终点节点</b>
+        </template>
+        <span class="lmb-actions">
+          <el-button v-if="linkFrom" type="text" size="mini" @click="resetLinkPick">重选起点</el-button>
+          <el-button type="text" size="mini" @click="toggleLinkMode">取消</el-button>
+        </span>
+      </div>
 
       <!-- 空画布引导 -->
       <div v-if="canvasReady && nodesData.length === 0" class="canvas-empty">
@@ -56,7 +80,7 @@
 
       <!-- 操作提示 -->
       <div class="canvas-hint">
-        <i class="el-icon-info"></i>右键节点 / 连线可查看详情、编辑或删除；拖动节点调整布局后请点击保存
+        <i class="el-icon-info"></i>点击“添加连接”后依次点两个节点即可连线；右键节点 / 连线可查看详情、编辑或删除；拖动节点调整布局后请点击保存
       </div>
     </div>
 
@@ -176,6 +200,10 @@ export default {
       edgeDialogMode: 'create', // 'create' | 'edit'
       currentEdge: null,
       edgeDetailVisible: false,
+
+      // 图上连线模式
+      linkMode: false,
+      linkFrom: null, // 已选起点节点 {id, label}
 
       // 画布动态宽高
       canvasWidth: '1200px',
@@ -768,9 +796,78 @@ export default {
         })
     },
 
-    handleAddLink() {
+    // ==================== 图上连线 ====================
+
+    toggleLinkMode() {
+      if (this.linkMode) {
+        this.exitLinkMode()
+      } else {
+        this.linkMode = true
+        this.linkFrom = null
+        const canvas = this.$refs.topologyCanvas
+        if (canvas && canvas.selectNodesByIds) {
+          canvas.selectNodesByIds([])
+        }
+      }
+    },
+
+    exitLinkMode() {
+      this.linkMode = false
+      this.linkFrom = null
+      const canvas = this.$refs.topologyCanvas
+      if (canvas && canvas.selectNodesByIds) {
+        canvas.selectNodesByIds([])
+      }
+    },
+
+    resetLinkPick() {
+      this.linkFrom = null
+      const canvas = this.$refs.topologyCanvas
+      if (canvas && canvas.selectNodesByIds) {
+        canvas.selectNodesByIds([])
+      }
+    },
+
+    handlePickNode(node) {
+      if (!this.linkMode || !node) return
+      const nodeId = typeof node === 'object' ? node.id : node
+      const nodeData = this.findNodeData(nodeId)
+      if (!nodeData) return
+
+      // 第一次点击：确定起点
+      if (!this.linkFrom) {
+        this.linkFrom = { id: nodeData.id, label: nodeData.label || nodeData.id }
+        const canvas = this.$refs.topologyCanvas
+        if (canvas && canvas.selectNodesByIds) {
+          canvas.selectNodesByIds([nodeData.id])
+        }
+        return
+      }
+
+      // 点击同一个节点：视为重选起点
+      if (this.linkFrom.id === nodeData.id) {
+        this.$message.info('已选中起点，请点击另一个节点作为终点')
+        return
+      }
+
+      // 第二次点击：确定终点，打开连接弹窗
+      const from = this.linkFrom
+      const to = { id: nodeData.id, label: nodeData.label || nodeData.id }
+
+      const existing = this.edgesData.find(e =>
+        (e.from === from.id && e.to === to.id) ||
+        (e.from === to.id && e.to === from.id)
+      )
+
+      this.exitLinkMode()
+
+      if (existing) {
+        this.$message.warning(`"${from.label}" 与 "${to.label}" 之间已存在连接，可右键该连接进行编辑`)
+        return
+      }
+
       this.edgeDialogMode = 'create'
-      this.currentEdge = null
+      this.currentEdge = { from: from.id, to: to.id }
       this.edgeDialogVisible = true
     },
 
@@ -1016,6 +1113,42 @@ export default {
 .canvas-hint i {
   margin-right: 4px;
   color: #409eff;
+}
+
+/* 图上连线状态条 */
+.link-mode-bar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  padding: 5px 8px 5px 14px;
+  font-size: 13px;
+  color: #303133;
+  border-radius: 16px;
+  background: #ecf5ff;
+  border: 1px solid #b3d8ff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
+  white-space: nowrap;
+}
+.link-mode-bar > i {
+  margin-right: 6px;
+  color: #409eff;
+}
+.link-mode-bar b {
+  margin: 0 2px;
+  color: #409eff;
+}
+.lmb-actions {
+  margin-left: 10px;
+  padding-left: 8px;
+  border-left: 1px solid #b3d8ff;
+}
+.lmb-actions .el-button {
+  padding: 3px 4px;
+  margin-left: 2px;
 }
 
 /* 右键菜单 */

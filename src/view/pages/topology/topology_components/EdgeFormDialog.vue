@@ -149,9 +149,10 @@ export default {
           color: (this.edgeData.color && this.edgeData.color.color) || '#333333'
         }
       } else {
+        // 新建模式：允许外部传入已选好的两端（图上连线时使用）
         this.formData = {
-          from: '',
-          to: '',
+          from: (this.edgeData && this.edgeData.from) || '',
+          to: (this.edgeData && this.edgeData.to) || '',
           label: '',
           color: '#333333'
         }

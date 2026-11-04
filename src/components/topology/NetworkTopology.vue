@@ -1,5 +1,5 @@
 <template>
-	<div :id="toponame" class="mynetwork" :style="{width:chartswidth,height:chartsheight}">
+	<div :id="toponame" class="mynetwork" :class="{ 'pick-mode': pickMode }" :style="{width:chartswidth,height:chartsheight}">
 		<!--用于画关系图的部分 :id="chartsname" :style="{width:chartswidth,height:chartsheight}"-->
 	</div>
 </template>
@@ -51,12 +51,19 @@
 					return "700px"
 				}
 			},
+			// 连线模式：开启后点击节点触发 pick_node 事件（单击选点，不拖拽）
+			pickMode:{
+				type:Boolean,
+				default:false
+			},
 		},
 		data(){
 			return{
 				network: null,
 				nodesDataSet: null,
-				edgesDataSet: null
+				edgesDataSet: null,
+				// 被固定选中的节点（连线模式下高亮起点），鼠标划过后不被清除
+				pinnedNodeId: null
 			}
 		},
 		watch: {
@@ -143,6 +150,7 @@
 
 				// 保存network实例供外部调用
 				this.network = network
+				this.pinnedNodeId = null
 
 				let postdev=list2dict(nodes)
 				let idlist=Object.keys(postdev);
@@ -175,7 +183,6 @@
 				});
         //鼠标右键
         network.on("oncontext", function (params) {
-        	console.log("rightclick event",params)
         	if (params.nodes.length != 0) {//确定为节点双击事件
         		let click_node_id = params.nodes[0];
         		that.$emit("rightclick", {"click_type": "node", "detail":postdev[click_node_id]})
@@ -197,9 +204,12 @@
 				});
 
         network.on("hoverNode", function (params) {
+          // 连线模式下固定起点后不再被 hover 选中覆盖
+          if (that.pinnedNodeId) return
           network.selectNodes([params.node])
         });
         network.on("blurNode", function (params) {
+          if (that.pinnedNodeId) return
           network.selectNodes([])
         });
         network.on("hoverEdge", function (params) {
@@ -209,10 +219,24 @@
           network.selectEdges([])
         });
 
+        //单击节点：连线模式下用于依次选取起点/终点
+        network.on("click", function (params) {
+          if (!that.pickMode) return
+          if (params.nodes.length === 0) return
+          let click_node_id = params.nodes[0]
+          that.$emit("pick_node", postdev[click_node_id])
+        });
+
 
 			},
 			saveNodePosition:function(position){
 				this.$emit("savePosition",position)
+			},
+			//父组件调用：高亮指定节点（连线模式下标记已选起点）
+			selectNodesByIds(ids){
+				if (!this.network) return
+				this.pinnedNodeId = (ids && ids.length) ? ids[0] : null
+				this.network.selectNodes(ids || [])
 			},
 			//父组件调用
 			focus_node(node_id){
@@ -239,5 +263,9 @@
 <style>
 	.mynetwork {
 		border: 1px solid lightgray;
+	}
+	/* 连线模式：鼠标指向节点显示十字准星，明确可点击 */
+	.mynetwork.pick-mode canvas {
+		cursor: crosshair;
 	}
 </style>

@@ -69,10 +69,44 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="实时流量" width="180" align="center">
+      <el-table-column label="实时流量" width="150" align="center">
         <template slot-scope="scope">
           <el-button type="text" size="mini" icon="el-icon-data-line" :disabled="!scope.row.loc_portname" @click="showEchartFlow(localPorts[scope.$index])">A 端</el-button>
           <el-button type="text" size="mini" icon="el-icon-data-line" :disabled="!scope.row.rem_portname" @click="showEchartFlow(remotePorts[scope.$index])">B 端</el-button>
+        </template>
+      </el-table-column>
+      <el-table-column label="端口操作" width="200" align="center">
+        <template slot-scope="scope">
+          <div class="op-line">
+            <span class="op-side">A</span>
+            <el-button
+              type="text"
+              size="mini"
+              :disabled="!scope.row.loc_portname || !scope.row.loc_ip"
+              :loading="portQueryKey === scope.$index + '|loc|cfg'"
+              @click="showPortConfig(localPorts[scope.$index], scope.$index, 'loc')">配置</el-button>
+            <el-button
+              type="text"
+              size="mini"
+              :disabled="!scope.row.loc_portname || !scope.row.loc_ip"
+              :loading="portQueryKey === scope.$index + '|loc|int'"
+              @click="showPortStatus(localPorts[scope.$index], scope.$index, 'loc')">状态</el-button>
+          </div>
+          <div class="op-line">
+            <span class="op-side">B</span>
+            <el-button
+              type="text"
+              size="mini"
+              :disabled="!scope.row.rem_portname || !scope.row.rem_ip"
+              :loading="portQueryKey === scope.$index + '|rem|cfg'"
+              @click="showPortConfig(remotePorts[scope.$index], scope.$index, 'rem')">配置</el-button>
+            <el-button
+              type="text"
+              size="mini"
+              :disabled="!scope.row.rem_portname || !scope.row.rem_ip"
+              :loading="portQueryKey === scope.$index + '|rem|int'"
+              @click="showPortStatus(remotePorts[scope.$index], scope.$index, 'rem')">状态</el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -84,7 +118,8 @@
       <el-button @click="handleClose" size="small">关 闭</el-button>
     </div>
 
-    <el-dialog :visible.sync="dialogFlowVisible" width="1280px" top="8vh" append-to-body>
+      <!-- 实时流量 -->
+      <el-dialog :visible.sync="dialogFlowVisible" width="1280px" top="8vh" append-to-body>
       <div slot="title" class="dialog-title">
         <i class="el-icon-data-line"></i>实时流量
         <span class="flow-target">
@@ -115,6 +150,31 @@
             v-bind:interval="flowInterval">
           </echart_error>
         </div>
+      </div>
+    </el-dialog>
+
+    <!-- 端口操作：配置 / 状态查询结果 -->
+    <el-dialog :visible.sync="portDialogVisible" :width="portDialogWidth" top="8vh" append-to-body>
+      <div slot="title" class="dialog-title">
+        <i :class="portDialogIcon"></i>{{ portDialogTitle }}
+        <span class="flow-target">
+          {{ portDialogDev }}
+          <span class="mono">{{ portDialogIfName }}</span>
+        </span>
+      </div>
+      <div v-if="portDialogAlias" class="flow-alias"><i class="el-icon-price-tag"></i>{{ portDialogAlias }}</div>
+      <div v-loading="portDialogLoading" class="port-output-wrap">
+        <el-input
+          class="port-output"
+          type="textarea"
+          resize="none"
+          readonly
+          :rows="portDialogRows"
+          v-model="portDialogText"></el-input>
+      </div>
+      <div slot="footer">
+        <el-button size="small" icon="el-icon-document-copy" :disabled="!portDialogText" @click="copyPortOutput">复制结果</el-button>
+        <el-button size="small" type="primary" @click="portDialogVisible = false">关闭</el-button>
       </div>
     </el-dialog>
   </el-dialog>
@@ -170,7 +230,20 @@ export default {
       // 实时流量
       dialogFlowVisible: false,
       flowPortInfo: {},
-      flowInterval: 5
+      flowInterval: 5,
+
+      // 端口操作（配置 / 状态）
+      portQueryKey: '',
+      portDialogVisible: false,
+      portDialogLoading: false,
+      portDialogTitle: '',
+      portDialogIcon: 'el-icon-document',
+      portDialogWidth: '960px',
+      portDialogDev: '',
+      portDialogIfName: '',
+      portDialogAlias: '',
+      portDialogText: '',
+      portDialogRows: 24
     }
   },
 
@@ -388,6 +461,72 @@ export default {
       }
       this.flowInterval = 15
       this.dialogFlowVisible = true
+    },
+
+    // ==================== 端口操作：配置 / 状态 ====================
+
+    // 查看端口配置
+    showPortConfig(port, index, side) {
+      if (!port || !port.ip || !port.portname) return
+      this.queryPort('cfg', port, side, index, () => collectorApi.getCurrentInterface({ ip: port.ip, if_name: port.portname }, {}))
+    },
+
+    // 查看端口状态
+    showPortStatus(port, index, side) {
+      if (!port || !port.ip || !port.portname) return
+      this.queryPort('int', port, side, index, () => collectorApi.getInterface({ ip: port.ip, if_name: port.portname }, {}))
+    },
+
+    queryPort(type, port, side, index, request) {
+      const isCfg = type === 'cfg'
+      this.portQueryKey = index + '|' + side + '|' + type
+      this.portDialogVisible = false
+      this.portDialogTitle = (isCfg ? '接口配置 - ' : '接口状态 - ') + port.portname
+      this.portDialogIcon = isCfg ? 'el-icon-document' : 'el-icon-monitor'
+      this.portDialogWidth = isCfg ? '960px' : '860px'
+      this.portDialogDev = port.name || port.ip
+      this.portDialogIfName = port.portname
+      this.portDialogAlias = port.portalias || ''
+      this.portDialogText = ''
+      this.portDialogRows = 24
+      this.portDialogVisible = true
+      this.portDialogLoading = true
+
+      request().then(response => {
+        const res = response.data || {}
+        const text = res.data === undefined || res.data === null ? '' : String(res.data)
+        this.portDialogText = text
+        this.portDialogRows = Math.max(Math.min(text.split('\n').length, 30), 8)
+        if (res.code !== 0 && !text) {
+          this.$message.error(res.message || '查询失败')
+        }
+      }).catch(error => {
+        console.error('查询端口信息失败:', error)
+        this.$message.error('查询失败，请重试')
+        this.portDialogVisible = false
+      }).finally(() => {
+        this.portDialogLoading = false
+        this.portQueryKey = ''
+      })
+    },
+
+    copyPortOutput() {
+      const text = this.portDialogText
+      if (!text) return
+      const done = () => this.$message({ type: 'success', message: '已复制', duration: 1500 })
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done)
+        return
+      }
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      done()
     }
   }
 }
@@ -591,5 +730,42 @@ export default {
   padding: 6px;
   border: 1px solid #ebeef5;
   border-radius: 6px;
+}
+
+/* 端口操作列 */
+.op-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 22px;
+}
+.op-line .el-button {
+  padding: 0;
+  margin-left: 8px;
+}
+.op-side {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  font-size: 11px;
+  text-align: center;
+  border-radius: 3px;
+  color: #909399;
+  background: #f4f4f5;
+}
+
+/* 端口查询结果 */
+.port-output-wrap {
+  min-height: 120px;
+}
+.port-output /deep/ .el-textarea__inner {
+  padding: 10px 12px;
+  font-family: Menlo, Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #d4d4d4;
+  background-color: #1e1e1e;
+  border-color: #1e1e1e;
 }
 </style>
