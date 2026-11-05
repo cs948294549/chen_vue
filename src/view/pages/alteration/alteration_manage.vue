@@ -18,6 +18,12 @@
           <el-form-item label="创建人">
             <el-input v-model="filters.username" placeholder="创建人" clearable style="width: 150px;"></el-input>
           </el-form-item>
+          <el-form-item label="设备">
+            <el-input v-model="filters.device_reg" placeholder="名称或IP" @keyup.enter.native="loadOrderList" clearable style="width: 150px;"></el-input>
+          </el-form-item>
+          <el-form-item label="配置命令">
+            <el-input v-model="filters.cmd_reg" placeholder="命令内容" @keyup.enter.native="loadOrderList" clearable style="width: 200px;"></el-input>
+          </el-form-item>
         </el-row>
         <el-row>
           <el-form-item label="工单类型">
@@ -220,6 +226,8 @@ export default {
         title: '',
         status: ['00', '01', '02', '10', '20'],  // 默认只显示进行中的工单
         username: '',
+        device_reg: '',
+        cmd_reg: '',
         op_type: '',
         create_time_range: null,
         my_tasks: true  // 默认勾选"待我处理"
@@ -351,6 +359,8 @@ export default {
             this.filters.status = filterData.status
           }
           if (filterData.username) this.filters.username = filterData.username
+          if (filterData.device_reg) this.filters.device_reg = filterData.device_reg
+          if (filterData.cmd_reg) this.filters.cmd_reg = filterData.cmd_reg
           if (filterData.op_type) this.filters.op_type = filterData.op_type
           if (filterData.create_time_range) this.filters.create_time_range = filterData.create_time_range
           if (typeof filterData.my_tasks === 'boolean') {
@@ -370,6 +380,8 @@ export default {
           title: this.filters.title || '',
           status: this.filters.status || [],
           username: this.filters.username || '',
+          device_reg: this.filters.device_reg || '',
+          cmd_reg: this.filters.cmd_reg || '',
           op_type: this.filters.op_type || '',
           create_time_range: this.filters.create_time_range || null,
           my_tasks: this.filters.my_tasks || false
@@ -420,6 +432,12 @@ export default {
       if (this.filters.username) {
         params.username = this.filters.username
       }
+      if (this.filters.device_reg) {
+        params.device_reg = this.filters.device_reg.trim()
+      }
+      if (this.filters.cmd_reg) {
+        params.cmd_reg = this.filters.cmd_reg.trim()
+      }
       if (this.filters.op_type) {
         params.op_type = this.filters.op_type
       }
@@ -453,6 +471,8 @@ export default {
         title: '',
         status: ['00', '01', '02', '10', '20'],  // 恢复默认状态筛选
         username: '',
+        device_reg: '',
+        cmd_reg: '',
         op_type: '',
         create_time_range: null,
         my_tasks: true  // 恢复默认勾选"待我处理"
