@@ -35,7 +35,7 @@
       <el-table-column prop="entry_count" label="条目数量" width="100" align="center">
         <template slot-scope="scope">
           <el-tag type="info" size="small">
-            {{ scope.row.entries.entries ? scope.row.entries.entries.length : 0 }} 条
+            {{ scope.row.entry_count }} 条
           </el-tag>
         </template>
       </el-table-column>
@@ -619,32 +619,54 @@ export default {
 
     handleView(row) {
       this.dialogMode = 'view'
-      const copied = JSON.parse(JSON.stringify(row))
-      // 确保 entries 是数组格式
-      if (copied.entries && copied.entries.entries) {
-        copied.entries = copied.entries.entries
-      }
-      // 按 seq 升序展示，与提交顺序保持一致
-      if (Array.isArray(copied.entries)) {
-        copied.entries.sort((a, b) => Number(a.seq) - Number(b.seq))
-      }
-      this.ruleForm = copied
-      this.dialogVisible = true
+      // 列表接口不返回 entries，查看时单独取详情
+      this.fetchStandardDetail(row).then(standard => {
+        const copied = JSON.parse(JSON.stringify(standard))
+        // 确保 entries 是数组格式
+        if (copied.entries && copied.entries.entries) {
+          copied.entries = copied.entries.entries
+        }
+        // 按 seq 升序展示，与提交顺序保持一致
+        if (Array.isArray(copied.entries)) {
+          copied.entries.sort((a, b) => Number(a.seq) - Number(b.seq))
+        }
+        this.ruleForm = copied
+        this.dialogVisible = true
+      })
     },
 
     handleEdit(row) {
       this.dialogMode = 'edit'
-      const copied = JSON.parse(JSON.stringify(row))
-      // 确保 entries 是数组格式
-      if (copied.entries && copied.entries.entries) {
-        copied.entries = copied.entries.entries
-      }
-      // 按 seq 升序展示，与提交顺序保持一致
-      if (Array.isArray(copied.entries)) {
-        copied.entries.sort((a, b) => Number(a.seq) - Number(b.seq))
-      }
-      this.ruleForm = copied
-      this.dialogVisible = true
+      // 列表接口不返回 entries，编辑时单独取详情
+      this.fetchStandardDetail(row).then(standard => {
+        const copied = JSON.parse(JSON.stringify(standard))
+        // 确保 entries 是数组格式
+        if (copied.entries && copied.entries.entries) {
+          copied.entries = copied.entries.entries
+        }
+        // 按 seq 升序展示，与提交顺序保持一致
+        if (Array.isArray(copied.entries)) {
+          copied.entries.sort((a, b) => Number(a.seq) - Number(b.seq))
+        }
+        this.ruleForm = copied
+        this.dialogVisible = true
+      })
+    },
+
+    fetchStandardDetail(row) {
+      // 取标准规则详情（含 entries），失败时降级用列表行数据
+      return prefixListApi.getStandardDetail({ id: row.id }).then(response => {
+        const res = response.data
+        if (res.code === 0 && res.data) {
+          return res.data
+        }
+        this.$message.error(res.message || '加载标准规则详情失败')
+        return row
+      }).catch(error => {
+        console.error('加载标准规则详情失败:', error)
+        this.$message.error('加载标准规则详情失败')
+        return row
+      })
     },
 
     handleDelete(row) {
@@ -670,18 +692,20 @@ export default {
     },
 
     handleManageConfig(row) {
-      // 打开配置管理对话框
-      const copied = JSON.parse(JSON.stringify(row))
-      // 确保 entries 格式正确
-      if (copied.entries && !copied.entries.entries) {
-        // 如果entries是数组，包装成 {entries: [...]} 格式
-        if (Array.isArray(copied.entries)) {
-          copied.entries = { entries: copied.entries }
+      // 打开配置管理对话框；列表接口不返回 entries，配置对比前先取详情
+      this.fetchStandardDetail(row).then(standard => {
+        const copied = JSON.parse(JSON.stringify(standard))
+        // 确保 entries 格式正确
+        if (copied.entries && !copied.entries.entries) {
+          // 如果entries是数组，包装成 {entries: [...]} 格式
+          if (Array.isArray(copied.entries)) {
+            copied.entries = { entries: copied.entries }
+          }
         }
-      }
-      this.currentManageStandard = copied
-      this.loadDeviceStatistics(copied)
-      this.manageDialogVisible = true
+        this.currentManageStandard = copied
+        this.manageDialogVisible = true
+        this.loadDeviceStatistics(copied)
+      })
     },
 
     // ==================== 配置管理操作 ====================
@@ -777,8 +801,15 @@ export default {
       })
     },
 
+    // 设备过多时只展示前 5 台，其余用数量表示
+    formatDeviceListText(devices) {
+      const MAX_SHOW = 5
+      const shown = devices.slice(0, MAX_SHOW).map(d => `${d.device_name}(${d.device_ip})`).join('、')
+      return devices.length > MAX_SHOW ? `${shown} 等 ${devices.length} 台` : shown
+    },
+
     handleCreateIssueRecords() {
-      const deviceList = this.selectedDevices.map(d => `${d.device_name}(${d.device_ip})`).join('、')
+      const deviceList = this.formatDeviceListText(this.selectedDevices)
 
       this.$prompt(`确定为以下 ${this.selectedDevices.length} 台设备创建处理记录吗？\n\n${deviceList}\n\n可选填备注信息：`, '创建处理记录', {
         confirmButtonText: '确定',

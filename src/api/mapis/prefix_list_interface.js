@@ -12,6 +12,11 @@ export default {
     return axios.post("/prefix_list/standards/list", data, params)
   },
 
+  // 获取标准规则详情（含条目明细）
+  getStandardDetail(data, params) {
+    return axios.post("/prefix_list/standards/detail", data, params)
+  },
+
   // 创建标准规则
   createStandard(data, params) {
     return axios.post("/prefix_list/standards/create", data, params)

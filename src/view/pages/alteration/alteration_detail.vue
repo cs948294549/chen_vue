@@ -146,18 +146,20 @@
 
         <div v-if="batchList.length > 0" class="batch-container">
           <div v-for="batch in batchList" :key="batch.batch" class="batch-group">
-            <div class="batch-header">
+            <div :class="['batch-header', { 'is-collapsed': isBatchCollapsed(batch.batch) }]" @click="toggleBatch(batch.batch)">
               <div class="batch-info">
+                <i :class="['batch-arrow', 'el-icon-arrow-right', { 'is-expanded': !isBatchCollapsed(batch.batch) }]"></i>
                 <span class="batch-number">批次 {{ batch.batch }}</span>
                 <span class="batch-count">{{ batch.devices.length }}台设备</span>
               </div>
-              <div class="batch-actions">
+              <div class="batch-actions" @click.stop>
                 <el-button v-if="canExecuteBatch" type="primary" size="small" icon="el-icon-video-play" :loading="executing" @click="handleExecuteBatch(batch)">执行批次</el-button>
                 <div v-else class="batch-tip">此批次设备将同时执行变更</div>
               </div>
             </div>
 
-            <div class="batch-devices">
+            <el-collapse-transition>
+            <div v-show="!isBatchCollapsed(batch.batch)" class="batch-devices">
               <div v-for="device in batch.devices" :key="device.pid" class="device-card">
                 <div class="device-card-header">
                   <div class="device-card-info">
@@ -216,6 +218,7 @@
                 </div>
               </div>
             </div>
+            </el-collapse-transition>
           </div>
         </div>
 
@@ -450,6 +453,9 @@ export default {
       finishing: false,
       rollingDevice: {},  // 设备回滚loading状态，key为pid
 
+      // 批次折叠状态，key为批次号，true表示已折叠
+      collapsedBatches: {},
+
       // 配置对比对话框
       configDiffDialogVisible: false,
       loadingConfigDiff: false,
@@ -587,6 +593,16 @@ export default {
     // 返回工单列表
     goBack() {
       this.$router.push({ path: '/pages/alteration/alteration_manage' })
+    },
+
+    // 批次是否已折叠
+    isBatchCollapsed(batch) {
+      return !!this.collapsedBatches[batch]
+    },
+
+    // 切换批次展开/折叠
+    toggleBatch(batch) {
+      this.$set(this.collapsedBatches, batch, !this.collapsedBatches[batch])
     },
 
     // 是否可以回滚设备（单台设备）
@@ -1589,12 +1605,29 @@ export default {
   background: linear-gradient(90deg, #409eff 0%, #66b1ff 100%);
   border-radius: 4px;
   margin-bottom: 15px;
+  cursor: pointer;
+  user-select: none;
+  transition: margin-bottom 0.2s;
+}
+
+.batch-header.is-collapsed {
+  margin-bottom: 0;
 }
 
 .batch-info {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.batch-arrow {
+  color: #fff;
+  font-size: 14px;
+  transition: transform 0.2s;
+}
+
+.batch-arrow.is-expanded {
+  transform: rotate(90deg);
 }
 
 .batch-number {

@@ -521,9 +521,16 @@ export default {
 
     // ==================== 创建处理记录 ====================
 
+    // 设备过多时只展示前 5 台，其余用数量表示
+    formatDeviceListText(devices) {
+      const MAX_SHOW = 5
+      const shown = devices.slice(0, MAX_SHOW).map(d => `${d.device_name}(${d.device_ip})`).join('、')
+      return devices.length > MAX_SHOW ? `${shown} 等 ${devices.length} 台` : shown
+    },
+
     handleCreateIssueRecords() {
       const selected = this.manageDialog.selectedDevices
-      const deviceText = selected.map(d => `${d.device_name}(${d.device_ip})`).join('、')
+      const deviceText = this.formatDeviceListText(selected)
 
       this.$prompt(`确定为以下 ${selected.length} 台设备创建处理记录吗？\n\n${deviceText}\n\n可选填备注信息：`, '创建处理记录', {
         confirmButtonText: '确定',

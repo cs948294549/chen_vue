@@ -93,10 +93,31 @@
             @click="handleBatchCreateTickets">
             批量创建工单 ({{ selectedRecords.length }})
           </el-button>
+          <el-dropdown
+            v-if="selectedRecords.length > 0"
+            size="mini"
+            style="margin-left: 10px;"
+            @command="handleBatchStatusChange">
+            <el-button type="warning" size="mini" icon="el-icon-edit">
+              批量标记 ({{ selectedRecords.length }}) <i class="el-icon-arrow-down el-icon--right"></i>
+            </el-button>
+            <el-dropdown-menu slot="dropdown">
+              <el-dropdown-item command="processing">
+                <i class="el-icon-loading" style="color: #409EFF;"></i> 处理中
+              </el-dropdown-item>
+              <el-dropdown-item command="completed">
+                <i class="el-icon-circle-check" style="color: #67c23a;"></i> 已完成
+              </el-dropdown-item>
+              <el-dropdown-item command="ignored">
+                <i class="el-icon-remove-outline" style="color: #909399;"></i> 忽略
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </el-dropdown>
         </div>
       </div>
 
       <el-table
+        ref="issueTable"
         :data="pagedTableData"
         border
         stripe
@@ -749,13 +770,19 @@ export default {
       this.$prompt('请输入工单标题（可选，留空则自动生成）', '批量创建工单', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
-        inputPlaceholder: '例如：ACL 配置变更-生产环境'
+        inputPlaceholder: '例如：ACL 配置变更-生产环境',
+        // 用 textarea 输入框，Element UI 只有单行输入框才会回车直接提交，
+        // 避免输入法选词时回车误触发提交
+        inputType: 'textarea',
+        inputValidator: () => true
       }).then(({ value }) => {
         const params = {
           issue_ids: this.selectedRecords.map(r => r.id)
         }
-        if (value && value.trim()) {
-          params.title = value.trim()
+        // textarea 里回车会换行，拼标题时去掉换行
+        const title = (value || '').replace(/\s+/g, ' ').trim()
+        if (title) {
+          params.title = title
         }
         this.submitChangeOrder(params)
       }).catch(() => {})
@@ -823,6 +850,59 @@ export default {
         }).catch(error => {
           console.error('状态更新失败:', error)
           this.$message.error('状态更新失败')
+        })
+      }).catch(() => {})
+    },
+
+    // 批量标记状态：只处理 pending 的记录，一次请求提交全部
+    handleBatchStatusChange(status) {
+      const records = this.selectedRecords.filter(r => r.status === 'pending')
+      if (records.length === 0) {
+        this.$message.warning('选中的记录中没有待处理状态的记录')
+        return
+      }
+
+      const statusText = this.getStatusText(status)
+      const skipped = this.selectedRecords.length - records.length
+      const skipTip = skipped > 0 ? `（另有 ${skipped} 条非待处理记录会被跳过）` : ''
+
+      this.$confirm(`确定将以下 ${records.length} 条记录标记为"${statusText}"吗？${skipTip}`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(() => {
+        const loading = this.$loading({ lock: true, text: '正在批量更新状态...' })
+
+        policyIssueApi.batchUpdateIssueStatus({
+          ids: records.map(r => r.id),
+          status
+        }).then(response => {
+          const res = response.data
+          if (res.code === 0) {
+            const data = res.data || {}
+            const notFound = data.not_found || []
+            if (notFound.length > 0) {
+              this.$alert(`成功 ${data.updated || 0} 条，${notFound.length} 条记录已不存在（ID: ${notFound.join(', ')}）`, '批量标记结果', {
+                confirmButtonText: '确定',
+                type: 'warning'
+              })
+            } else {
+              this.$message.success(`批量标记完成：成功 ${data.updated || records.length} 条`)
+            }
+
+            this.selectedRecords = []
+            if (this.$refs.issueTable) {
+              this.$refs.issueTable.clearSelection()
+            }
+            this.loadData()
+          } else {
+            this.$message.error(res.message || '批量更新状态失败')
+          }
+        }).catch(error => {
+          console.error('批量更新状态失败:', error)
+          this.$message.error('批量更新状态失败')
+        }).finally(() => {
+          loading.close()
         })
       }).catch(() => {})
     },
