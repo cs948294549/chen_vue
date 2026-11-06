@@ -3,7 +3,7 @@
     title="Tor设备MAC"
     icon="el-icon-s-grid"
     export-name="tor_mac_list"
-    tip="数据量大，需要输入精确的设备IP"
+    tip="数据量大，需要输入精确的设备IP或设备名；用设备名查询可能很慢"
     :filters="filters"
     :columns="columns"
     :validate="validate"
@@ -20,6 +20,7 @@
       return {
         filters: [
           { key: "switch_ip", label: "设备IP" },
+          { key: "sysname", label: "设备名" },
         ],
         columns: [
           { prop: "sysname", label: "设备名", minWidth: 200, type: "device" },
@@ -34,10 +35,16 @@
     },
     methods: {
       validate(v) {
-        return v.switch_ip !== "" ? "" : "数量大，需要精确查询设备IP"
+        return v.switch_ip !== "" || v.sysname !== "" ? "" : "数量大，设备IP和设备名至少填写一项"
       },
       request(v) {
-        return collector_api.getMACList({ switch_ip: v.switch_ip }, {})
+        let post_data = {}
+        ;["switch_ip", "sysname"].forEach(k => {
+          if (v[k] !== "") {
+            post_data[k] = v[k]
+          }
+        })
+        return collector_api.getMACList(post_data, {})
       },
     },
   }

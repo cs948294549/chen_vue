@@ -3,7 +3,7 @@
     title="ARP列表"
     icon="el-icon-sort"
     export-name="arp_list"
-    tip="设备IP 和 ARP IP 至少填写一项"
+    tip="设备IP、ARP IP、设备名 至少填写一项"
     :filters="filters"
     :columns="columns"
     :validate="validate"
@@ -36,7 +36,8 @@
     },
     methods: {
       validate(v) {
-        return v.ip !== "" || v.arp_ip !== "" ? "" : "设备IP和ARP IP至少包含一项筛选项"
+        const has = v.ip !== "" || v.arp_ip !== "" || v.sysname !== ""
+        return has ? "" : "设备IP、ARP IP、设备名至少包含一项筛选项"
       },
       request(v) {
         let post_data = {}

@@ -1054,27 +1054,49 @@ export default {
     },
 
     handleFinishChange() {
+      // 检查是否存在未执行成功的设备
+      const unfinishedDevices = this.deviceList.filter(d => d.status !== '10')
+
+      if (unfinishedDevices.length > 0) {
+        const detail = unfinishedDevices
+          .map(d => `${d.sysname || d.ip}（${this.getDeviceStatusText(d.status)}）`)
+          .join('、')
+        this.$confirm(
+          `当前有 ${unfinishedDevices.length} 台设备未执行成功：${detail}。结束后将无法继续执行或回滚，确认结束变更吗？`,
+          '存在未执行成功的设备',
+          {
+            confirmButtonText: '仍然结束',
+            cancelButtonText: '取消',
+            type: 'warning',
+            dangerouslyUseHTMLString: false
+          }
+        ).then(() => this.doFinishChange()).catch(() => {})
+        return
+      }
+
       this.$confirm('确认结束变更吗？', '结束确认', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
-      }).then(() => {
-        this.finishing = true
-        alterationApi.finishChange({ op_id: this.opId }).then(response => {
-          if (response.data.code === 0) {
-            this.$message.success('变更已结束')
-            this.loadOrderDetail()
-            this.loadLogList()
-          } else {
-            this.$message.error(response.data.message || '结束变更失败')
-          }
-          this.finishing = false
-        }).catch(error => {
-          console.error('结束变更失败:', error)
-          this.$message.error('结束变更失败')
-          this.finishing = false
-        })
-      }).catch(() => {})
+      }).then(() => this.doFinishChange()).catch(() => {})
+    },
+
+    doFinishChange() {
+      this.finishing = true
+      alterationApi.finishChange({ op_id: this.opId }).then(response => {
+        if (response.data.code === 0) {
+          this.$message.success('变更已结束')
+          this.loadOrderDetail()
+          this.loadLogList()
+        } else {
+          this.$message.error(response.data.message || '结束变更失败')
+        }
+        this.finishing = false
+      }).catch(error => {
+        console.error('结束变更失败:', error)
+        this.$message.error('结束变更失败')
+        this.finishing = false
+      })
     },
 
     handleCancel() {
@@ -1212,7 +1234,7 @@ export default {
         cancelButtonText: '取消',
         type: 'warning'
       }).then(() => {
-        alterationApi.deleteDevice({ pid: row.pid }).then(response => {
+        alterationApi.deleteDevice({ pid: row.pid, op_id: this.opId }).then(response => {
           if (response.data.code === 0) {
             this.$message.success('删除成功')
             this.loadDeviceList()

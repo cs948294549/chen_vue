@@ -18,6 +18,7 @@
     data() {
       return {
         filters: [
+          { key: "sysname", label: "设备名" },
           { key: "ip", label: "设备IP" },
           { key: "sn_name", label: "模块类型" },
           { key: "sn_desc", label: "模块描述" },
@@ -36,7 +37,7 @@
     methods: {
       request(v) {
         let post_data = {}
-        ;["ip", "sn_name", "sn_desc"].forEach(k => {
+        ;["sysname", "ip", "sn_name", "sn_desc"].forEach(k => {
           if (v[k] !== "") {
             post_data[k] = v[k]
           }

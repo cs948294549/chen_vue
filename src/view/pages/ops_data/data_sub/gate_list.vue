@@ -24,6 +24,7 @@
     data() {
       return {
         filters: [
+          { key: "sysname", label: "设备名" },
           { key: "ip", label: "设备IP" },
           { key: "server", label: "服务器IP", placeholder: "IP地址" },
           { key: "flag", label: "版本", type: "select", default: "V4", clearable: false, options: [
@@ -48,6 +49,9 @@
     methods: {
       request(v) {
         let post_data = {}
+        if (v.sysname !== "") {
+          post_data["sysname"] = v.sysname
+        }
         if (v.ip !== "") {
           post_data["ip"] = v.ip
         }

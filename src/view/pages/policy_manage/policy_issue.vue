@@ -26,11 +26,12 @@
             filterable
             clearable
             style="width: 220px;">
+            <!-- 未选对象类型时四类规则合并展示，各表 id 会重复，key/value 带上类型 -->
             <el-option
               v-for="item in standardOptions"
-              :key="item.id"
+              :key="`${item.object_type}:${item.id}`"
               :label="item.name"
-              :value="item.id">
+              :value="`${item.object_type}:${item.id}`">
             </el-option>
           </el-select>
         </el-form-item>
@@ -575,7 +576,7 @@ export default {
       const tasks = []
 
       if (!objectType || objectType === 'prefix_list') {
-        tasks.push(prefixListApi.getStandardsList({ is_active: 1 }).then(res => this.pickOptions(res, 'prefix')))
+        tasks.push(prefixListApi.getStandardsList({ is_active: 1 }).then(res => this.pickOptions(res, 'prefix_list')))
       }
       if (!objectType || objectType === 'acl') {
         tasks.push(aclApi.getStandardsList({ is_active: 1 }).then(res => this.pickOptions(res, 'acl')))
@@ -625,9 +626,18 @@ export default {
     // ==================== 数据加载 ====================
 
     loadData() {
+      // 筛选栏标准规则的值是 "object_type:id"，拆开后分别传
+      let objectType = this.filterForm.object_type || undefined
+      let standardId = null
+      if (this.filterForm.standard_id) {
+        const sep = this.filterForm.standard_id.lastIndexOf(':')
+        objectType = this.filterForm.standard_id.slice(0, sep)
+        standardId = Number(this.filterForm.standard_id.slice(sep + 1))
+      }
+
       const params = {
-        object_type: this.filterForm.object_type || undefined,
-        standard_id: this.filterForm.standard_id,
+        object_type: objectType,
+        standard_id: standardId,
         device: this.filterForm.device,
         status: this.filterForm.status
       }
