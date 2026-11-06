@@ -103,6 +103,8 @@ export default {
 
 <style scoped>
 .ap-card {
+  display: flex;
+  flex-direction: column;
   background: #fff;
   border: 1px solid #e4e7ed;
   border-radius: 8px;
@@ -190,6 +192,7 @@ export default {
 .client-stat {
   display: flex;
   align-items: center;
+  margin-top: auto;
   padding: 12px;
   border-radius: 6px;
   border: 1px solid #b3d8ff;

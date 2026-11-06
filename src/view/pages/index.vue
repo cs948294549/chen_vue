@@ -9,16 +9,20 @@
     </div>
 
     <div class="dashboard-grid">
-      <div class="grid-col-2">
+      <div class="grid-col">
         <DeviceStatCard />
+        <ConfigBackupCard :days="1" />
       </div>
-      <div class="grid-col-1">
+      <div class="grid-col">
         <ApStatusCard />
       </div>
-      <div class="grid-col-1">
+    </div>
+
+    <div class="dashboard-row">
+      <div class="row-cell">
         <RecentChangesCard :days="2" />
       </div>
-      <div class="grid-col-1">
+      <div class="row-cell">
         <PendingOrdersCard />
       </div>
     </div>
@@ -30,6 +34,7 @@ import DeviceStatCard from './main_components/DeviceStatCard.vue'
 import ApStatusCard from './main_components/ApStatusCard.vue'
 import RecentChangesCard from './main_components/RecentChangesCard.vue'
 import PendingOrdersCard from './main_components/PendingOrdersCard.vue'
+import ConfigBackupCard from './main_components/ConfigBackupCard.vue'
 
 export default {
   name: 'HomePage',
@@ -37,7 +42,8 @@ export default {
     DeviceStatCard,
     ApStatusCard,
     RecentChangesCard,
-    PendingOrdersCard
+    PendingOrdersCard,
+    ConfigBackupCard
   }
 }
 </script>
@@ -71,23 +77,38 @@ export default {
 }
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+  align-items: stretch;
 }
-.grid-col-1 {
-  grid-column: span 1;
+.grid-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
 }
-.grid-col-2 {
-  grid-column: span 2;
+.grid-col > * {
+  flex: 1;
+}
+.dashboard-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+.row-cell {
+  display: flex;
+  min-width: 0;
+}
+.row-cell > * {
+  flex: 1;
+  min-width: 0;
 }
 
 @media (max-width: 1200px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-  .grid-col-1,
-  .grid-col-2 {
-    grid-column: span 1;
+  .dashboard-grid,
+  .dashboard-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

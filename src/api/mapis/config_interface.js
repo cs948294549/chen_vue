@@ -43,5 +43,10 @@ export default {
   // 获取最近发生过配置变更的设备列表
   getChangedDevices(data, params) {
     return axios.post("/config/get_changed_devices", data, params)
+  },
+
+  // 统计设备配置备份情况
+  getBackupStatus(data, params) {
+    return axios.post("/config/get_backup_status", data, params)
   }
 }
