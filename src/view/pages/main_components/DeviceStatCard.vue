@@ -138,6 +138,18 @@ export default {
       return ''
     },
 
+    // 弹框用 dangerouslyUseHTMLString 渲染，设备名等字段需转义
+    escapeHtml (val) {
+      if (val === null || val === undefined || val === '') return ''
+      return String(val).replace(/[&<>"']/g, c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[c])
+    },
+
     showOfflineDevices () {
       if (this.stats.offline === 0) {
         this.$message.info('当前没有离线设备')
@@ -146,22 +158,28 @@ export default {
 
       const deviceList = this.offlineDevices.map(d => {
         return `<tr>
-          <td style="padding: 8px; border: 1px solid #ebeef5;">${d.sysname || '-'}</td>
-          <td style="padding: 8px; border: 1px solid #ebeef5; font-family: monospace;">${d.ip}</td>
-          <td style="padding: 8px; border: 1px solid #ebeef5;">${d.sys_type || '-'}</td>
-          <td style="padding: 8px; border: 1px solid #ebeef5;">${d.timestamp || '-'}</td>
+          <td class="col-name">${this.escapeHtml(d.sysname) || '-'}</td>
+          <td class="col-ip">${this.escapeHtml(d.ip) || '-'}</td>
+          <td class="col-vendor">${this.escapeHtml(d.sys_type) || '-'}</td>
+          <td class="col-time">${this.escapeHtml(d.timestamp) || '-'}</td>
         </tr>`
       }).join('')
 
       this.$alert(`
-        <div style="max-height: 500px; overflow-y: auto;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <div class="offline-table-wrapper">
+          <table class="offline-table">
+            <colgroup>
+              <col class="col-name">
+              <col class="col-ip">
+              <col class="col-vendor">
+              <col class="col-time">
+            </colgroup>
             <thead>
-              <tr style="background: #f5f7fa;">
-                <th style="padding: 8px; border: 1px solid #ebeef5; text-align: left;">设备名称</th>
-                <th style="padding: 8px; border: 1px solid #ebeef5; text-align: left;">设备IP</th>
-                <th style="padding: 8px; border: 1px solid #ebeef5; text-align: left;">厂商</th>
-                <th style="padding: 8px; border: 1px solid #ebeef5; text-align: left;">最后采集时间</th>
+              <tr>
+                <th>设备名称</th>
+                <th>设备IP</th>
+                <th>厂商</th>
+                <th>最后采集时间</th>
               </tr>
             </thead>
             <tbody>
@@ -307,4 +325,48 @@ export default {
 .vendor-success .vendor-name { color: #67c23a; }
 .vendor-info { border-color: #d3d4d6; background: #f4f4f5; }
 .vendor-info .vendor-name { color: #909399; }
+</style>
+
+<!-- MessageBox 挂载在 body 下，不能用 scoped -->
+<style>
+.offline-devices-dialog {
+  width: 900px;
+  max-width: 92vw;
+}
+.offline-devices-dialog .el-message-box__content {
+  padding: 10px 15px;
+}
+.offline-devices-dialog .el-message-box__message {
+  width: 100%;
+}
+.offline-devices-dialog .offline-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+.offline-devices-dialog .offline-table th,
+.offline-devices-dialog .offline-table td {
+  padding: 8px;
+  border: 1px solid #ebeef5;
+  text-align: left;
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+.offline-devices-dialog .offline-table th {
+  background: #f5f7fa;
+  font-weight: 600;
+  color: #606266;
+}
+.offline-devices-dialog .offline-table td.col-ip {
+  font-family: Menlo, Consolas, monospace;
+}
+.offline-devices-dialog .offline-table .col-name { width: 30%; }
+.offline-devices-dialog .offline-table .col-ip { width: 20%; }
+.offline-devices-dialog .offline-table .col-vendor { width: 20%; }
+.offline-devices-dialog .offline-table .col-time { width: 30%; }
+.offline-devices-dialog .offline-table-wrapper {
+  max-height: 55vh;
+  overflow-y: auto;
+}
 </style>

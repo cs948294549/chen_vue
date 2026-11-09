@@ -1464,7 +1464,9 @@ export default {
 
 /* 操作记录 */
 .log-section {
+  flex: 0 0 550px;
   width: 550px;
+  min-width: 0;
   background: #fff;
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -1502,18 +1504,22 @@ export default {
   background: #f9fafc;
   border-radius: 4px;
   border-left: 3px solid #409eff;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .log-time {
   font-size: 12px;
   color: #909399;
   margin-bottom: 8px;
+  overflow-wrap: break-word;
 }
 
 .log-content {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .log_tag {
@@ -1555,12 +1561,17 @@ export default {
   font-size: 13px;
   color: #606266;
   line-height: 1.6;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-all;
 }
 
 .log-user {
   font-size: 12px;
   color: #909399;
   text-align: right;
+  overflow-wrap: break-word;
 }
 
 /* 下半部分 */
