@@ -175,12 +175,13 @@
 
         <el-table-column prop="timestamp" label="采集时间" width="160"></el-table-column>
 
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template slot-scope="scope">
             <el-button size="mini" type="text" :loading="loadingKey === scope.row.if_name + '|cfg'" @click="disconfig(scope.row)">配置</el-button>
             <el-button size="mini" type="text" :loading="loadingKey === scope.row.if_name + '|int'" @click="disinterface(scope.row)">状态</el-button>
             <el-button size="mini" type="text" :loading="loadingKey === scope.row.if_name + '|trans'" @click="distransceiver(scope.row)">光衰</el-button>
-            <el-button size="mini" type="text" @click="showEchartFlow(scope.row)">流量</el-button>
+            <el-button size="mini" type="text" @click="showEchartFlow(scope.row)">实时</el-button>
+            <el-button size="mini" type="text" @click="showHistoryFlow(scope.row)">历史流量</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -355,6 +356,14 @@
       ></ssh_card>
     </el-dialog>
 
+    <el-dialog
+      :title="'历史流量 - ' + (history_flow_info.sysname || device_info.sysname || '') + ' ' + (history_flow_info.if_name || '')"
+      :visible.sync="dialog_history_flow"
+      width="75%"
+      custom-class="history-flow-dialog">
+      <port_traffic v-if="dialog_history_flow" :port_info="history_flow_info"></port_traffic>
+    </el-dialog>
+
     <el-dialog :title="'实时流量 - ' + (flow_p_info.sysname || device_info.sysname || '') + ' ' + (flow_p_info.if_name || '')" :visible.sync="dialog_flow" width="80%">
       <div class="flow-tip"><i class="el-icon-info"></i>采集间隔 <b>{{ flow_interval }}</b> 秒<span v-if="flow_p_info.alias">，端口描述：{{ flow_p_info.alias }}</span></div>
       <div v-if="dialog_flow" class="flow-charts">
@@ -394,11 +403,12 @@ import ConfigCompareDrawer from "./components/ConfigCompareDrawer.vue"
 
 import echart_flow from "@/components/echarts/echart_single_flow.vue"
 import echart_error from "@/components/echarts/echart_single_error.vue"
+import port_traffic from "@/components/echarts/echart_port_traffic.vue"
 
 
 export default {
   components:{
-    topo_div,echart_flow,echart_error, ssh_card, ConfigCompareDrawer
+    topo_div,echart_flow,echart_error,port_traffic, ssh_card, ConfigCompareDrawer
   },
   data () {
     return {
@@ -483,6 +493,10 @@ export default {
       dialog_flow:false,
       flow_p_info:{},
       flow_interval: 5,
+
+      //历史流量
+      dialog_history_flow:false,
+      history_flow_info:{},
 
       cli_load:false,
 
@@ -1071,6 +1085,22 @@ export default {
         this.flow_interval=16
       }
       this.dialog_flow=true
+    },
+    //历史流量（Zabbix，按 35d 保留期分段取 history / trend）
+    showHistoryFlow(row){
+      if(row["port_id"]===undefined || row["port_id"]===null || row["port_id"]===""){
+        this.$message({type: 'warning', message: '该端口缺少端口索引（port_id），无法查询历史流量'})
+        return
+      }
+      this.dialog_history_flow=false
+      this.history_flow_info={
+        "ip":row["ip"],
+        "if_name":row["if_name"],
+        "port_id":row["port_id"],
+        "sysname":row["sysname"] || this.device_info["sysname"] || "",
+        "alias": row["alias"],
+      }
+      this.dialog_history_flow=true
     },
     showXterm(){
       this.webssh_target = this.device_info["ip"]

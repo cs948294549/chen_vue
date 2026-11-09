@@ -48,6 +48,10 @@ export default {
   getDeviceSummary (data, params) {
     return axios.post("/collector/device_summary", data, params)
   },
+  // 端口历史流量（数据来自 Zabbix，按 35d 保留期分段取 history / trend）
+  getPortTraffic (data, params) {
+    return axios.post("/collector/port_traffic", data, params)
+  },
 
   //command相关数据
   getCurrentInterface (data, params) {

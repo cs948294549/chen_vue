@@ -69,10 +69,18 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="实时流量" width="150" align="center">
+      <el-table-column label="流量曲线" width="170" align="center">
         <template slot-scope="scope">
-          <el-button type="text" size="mini" icon="el-icon-data-line" :disabled="!scope.row.loc_portname" @click="showEchartFlow(localPorts[scope.$index])">A 端</el-button>
-          <el-button type="text" size="mini" icon="el-icon-data-line" :disabled="!scope.row.rem_portname" @click="showEchartFlow(remotePorts[scope.$index])">B 端</el-button>
+          <div class="op-line">
+            <span class="op-side">A</span>
+            <el-button type="text" size="mini" icon="el-icon-data-line" :disabled="!scope.row.loc_portname" @click="showEchartFlow(localPorts[scope.$index])">实时</el-button>
+            <el-button type="text" size="mini" icon="el-icon-time" :disabled="!scope.row.loc_portname || !scope.row.loc_portid" @click="showHistoryFlow(localPorts[scope.$index])">历史</el-button>
+          </div>
+          <div class="op-line">
+            <span class="op-side">B</span>
+            <el-button type="text" size="mini" icon="el-icon-data-line" :disabled="!scope.row.rem_portname" @click="showEchartFlow(remotePorts[scope.$index])">实时</el-button>
+            <el-button type="text" size="mini" icon="el-icon-time" :disabled="!scope.row.rem_portname || !scope.row.rem_portid" @click="showHistoryFlow(remotePorts[scope.$index])">历史</el-button>
+          </div>
         </template>
       </el-table-column>
       <el-table-column label="端口操作" width="200" align="center">
@@ -153,6 +161,19 @@
       </div>
     </el-dialog>
 
+    <!-- 历史流量（Zabbix） -->
+    <el-dialog :visible.sync="dialogHistoryFlowVisible" width="1100px" top="8vh" append-to-body>
+      <div slot="title" class="dialog-title">
+        <i class="el-icon-time"></i>历史流量
+        <span class="flow-target">
+          {{ historyFlowPortInfo.sysname }}
+          <span class="mono">{{ historyFlowPortInfo.if_name }}</span>
+        </span>
+      </div>
+      <div v-if="historyFlowPortInfo.alias" class="flow-alias"><i class="el-icon-price-tag"></i>{{ historyFlowPortInfo.alias }}</div>
+      <port_traffic v-if="dialogHistoryFlowVisible" :port_info="historyFlowPortInfo"></port_traffic>
+    </el-dialog>
+
     <!-- 端口操作：配置 / 状态查询结果 -->
     <el-dialog :visible.sync="portDialogVisible" :width="portDialogWidth" top="8vh" append-to-body>
       <div slot="title" class="dialog-title">
@@ -184,6 +205,7 @@
 import collectorApi from '@/api/mapis/collector_interface'
 import echart_flow from '@/components/echarts/echart_single_flow.vue'
 import echart_error from '@/components/echarts/echart_single_error.vue'
+import port_traffic from '@/components/echarts/echart_port_traffic.vue'
 
 // 设备名[接口名]，如 CORE-01[GigabitEthernet1/0/24]
 const SPEC_RE = /^\s*(.+?)\s*\[\s*(.+?)\s*\]\s*$/
@@ -202,7 +224,8 @@ export default {
 
   components: {
     echart_flow,
-    echart_error
+    echart_error,
+    port_traffic
   },
 
   props: {
@@ -231,6 +254,8 @@ export default {
       dialogFlowVisible: false,
       flowPortInfo: {},
       flowInterval: 5,
+      dialogHistoryFlowVisible: false,
+      historyFlowPortInfo: {},
 
       // 端口操作（配置 / 状态）
       portQueryKey: '',
@@ -461,6 +486,23 @@ export default {
       }
       this.flowInterval = 15
       this.dialogFlowVisible = true
+    },
+
+    // 历史流量：数据来自 Zabbix，按 sysname + port_id 查询
+    showHistoryFlow(row) {
+      if (!row || row.portid === undefined || row.portid === null || row.portid === '') {
+        this.$message({type: 'warning', message: '该端口缺少端口索引（port_id），无法查询历史流量'})
+        return
+      }
+      this.dialogHistoryFlowVisible = false
+      this.historyFlowPortInfo = {
+        ip: row.ip,
+        if_name: row.portname,
+        port_id: row.portid,
+        sysname: row.name,
+        alias: row.portalias
+      }
+      this.dialogHistoryFlowVisible = true
     },
 
     // ==================== 端口操作：配置 / 状态 ====================
