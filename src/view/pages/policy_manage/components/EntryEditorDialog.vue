@@ -39,9 +39,9 @@
                 <el-option v-for="t in addrTypes" :key="t.value" :label="t.label" :value="t.value"></el-option>
               </el-select>
               <el-input
-                v-if="draft.src.type === 'network' || draft.src.type === 'host'"
+                v-if="draft.src.type === 'network'"
                 v-model="draft.src.address"
-                :placeholder="draft.src.type === 'host' ? '如 10.8.83.96' : '如 10.32.0.0/14'"
+                placeholder="如 10.32.0.0/14，单主机如 10.8.83.96/32"
                 style="margin-top:6px;">
                 <template slot="prepend"><i class="el-icon-connection"></i></template>
               </el-input>
@@ -73,9 +73,9 @@
                 <el-option v-for="t in addrTypes" :key="t.value" :label="t.label" :value="t.value"></el-option>
               </el-select>
               <el-input
-                v-if="draft.dst.type === 'network' || draft.dst.type === 'host'"
+                v-if="draft.dst.type === 'network'"
                 v-model="draft.dst.address"
-                :placeholder="draft.dst.type === 'host' ? '如 10.8.83.96' : '如 10.32.0.0/14'"
+                placeholder="如 10.32.0.0/14，单主机如 10.8.83.96/32"
                 style="margin-top:6px;">
                 <template slot="prepend"><i class="el-icon-connection"></i></template>
               </el-input>
@@ -208,9 +208,7 @@ export default {
       ;["src", "dst"].forEach(key => {
         const spec = d[key]
         if (spec.type === "network" && !spec.address) {
-          e[key] = "请输入网段，如 10.32.0.0/14"
-        } else if (spec.type === "host" && !spec.address) {
-          e[key] = "请输入主机地址，如 10.8.83.96"
+          e[key] = "请输入网段，如 10.32.0.0/14；单主机写 /32"
         } else if (spec.type === "addrgroup" && !spec.name) {
           e[key] = "请输入地址组名"
         }
@@ -257,7 +255,8 @@ function cloneAddr(spec) {
   if (!spec) return { type: "any", address: "", name: "" }
   if (spec.type === "any") return { type: "any", address: "", name: "" }
   if (spec.type === "addrgroup") return { type: "addrgroup", address: "", name: spec.name || "" }
-  return { type: spec.type, address: spec.address || "", name: "" }
+  // host 是已废弃类型，存量数据按 network 打开，保存时即自动收敛
+  return { type: "network", address: spec.address || "", name: "" }
 }
 
 function clonePort(spec) {
@@ -274,10 +273,11 @@ function cleanAddr(spec) {
   if (spec.type === "any") return { type: "any" }
   if (spec.type === "addrgroup") return { type: "addrgroup", name: spec.name }
   const address = String(spec.address || "").trim()
-  if (spec.type === "host" && address && !address.includes("/")) {
-    return { type: "host", address: address + "/32" }
+  // 只填 IP 不填掩码时按单主机补 /32，与 parser 对裸地址的归一一致
+  if (address && !address.includes("/")) {
+    return { type: "network", address: address + (address.includes(":") ? "/128" : "/32") }
   }
-  return { type: spec.type, address }
+  return { type: "network", address }
 }
 
 function cleanPort(spec, protocol) {

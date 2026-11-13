@@ -13,13 +13,23 @@
       </div>
     </template>
 
+    <!-- 原始日志已超过7天保留期，提示而非当成查询失败 -->
+    <el-alert
+      v-if="expired"
+      title="该告警原始日志已超过7天保留期，已被清理，仅保留告警本身的统计信息"
+      type="warning"
+      show-icon
+      :closable="false"
+      style="margin-bottom: 10px;"
+    />
+
     <!-- Element UI 滚动条组件，实现优雅纵向滚动 -->
     <el-scrollbar class="log-scroll-container" height="100%">
       <!-- 日志列表容器 -->
       <div class="log-list">
         <!-- 空日志提示 -->
         <div class="log-empty-tip" v-if="logData.length === 0">
-          暂无日志数据可展示
+          {{ expired ? '日志已过期清理，无数据可展示' : '暂无日志数据可展示' }}
         </div>
         <!-- 日志条目循环渲染 -->
         <div
@@ -27,14 +37,24 @@
           v-for="(log, index) in formattedLogData"
           :key="index"
           :class="{
-            'log-item-unhandled': log.status === 0,
-            'log-item-handled': log.status !== 0
+            'log-item-unhandled': log.is_read === 0,
+            'log-item-handled': log.is_read !== 0
           }"
         >
-          <!-- 左侧状态标识（区分未处理/已处理） -->
+          <!-- 左侧状态标识（区分未读/已读） -->
           <div class="log-status-tag"></div>
-          <!-- 日志内容（等宽字体，还原服务器日志效果） -->
-          <div class="log-message">{{ log.msg }}</div>
+          <!-- 日志内容（等宽字体，还原服务器日志效果）
+
+               时间和事件码加了 user-select:none —— 它们是管线补上的
+               （采集时间、归一化事件码），不是设备发的原文。划选复制时
+               只应该拿到 msg，混进这两列粘出去就不是一条能直接搜的日志了 -->
+          <span class="handler-time">{{ log.formatIngestTime }}</span>
+          <!-- 事件码为空时用占位块撑住同样宽度，不然那一行的 msg 会左移，
+               整列就对不齐了。title 兜住超长被截断的（最长 17 个字符的
+               MAC_FLAP_SUPPRESS 放得下，更长的鼠标悬停看全名） -->
+          <span class="handler-name" v-if="log.event_code" :title="log.event_code">{{ log.event_code }}</span>
+          <span class="handler-name-placeholder" v-else></span>
+          <span class="handler-msg">{{ log.msg }}</span>
         </div>
       </div>
     </el-scrollbar>
@@ -45,15 +65,19 @@
 export default {
   name: 'LogDisplay',
   props: {
-    // 父组件传入的日志数组（必传）
+    // 父组件传入的日志数组（必传），alarm_log 原子记录
     logData: {
       type: Array,
       required: true,
       validator: (value) => {
-        // 数据格式校验：数组中的每个元素必须包含 message 字段
         if (value.length === 0) return true;
-        return value.every(item => item.hasOwnProperty('msg') && item.hasOwnProperty('status'));
+        return value.every(item => item.hasOwnProperty('msg'));
       }
+    },
+    // 日志是否已超过7天保留期被清理
+    expired: {
+      type: Boolean,
+      default: false
     },
     // 可选：卡片标题（自定义）
     cardTitle: {
@@ -67,18 +91,12 @@ export default {
     }
   },
   computed: {
-    // 卡片头部配置
-    logCardHeader() {
-      return {
-        text: this.cardTitle,
-        extra: `<span class="log-count-tip">共 ${this.logData.length} 条日志</span>`
-      };
-    },
-    // 格式化日志数据（确保 status 为数字类型，避免类型错误）
+    // 格式化日志数据（确保 is_read 为数字类型，避免类型错误）
     formattedLogData() {
       return this.logData.map(log => ({
         ...log,
-        status: Number(log.status) || 0 // 兼容非数字类型 status，默认转为 0（未处理）
+        is_read: Number(log.is_read) || 0,
+        formatIngestTime: this.formatTime(log.ingest_ts)
       }));
     }
   },
@@ -90,6 +108,25 @@ export default {
         scrollContainer.style.height = this.containerHeight;
       }
     });
+  },
+  methods: {
+    /**
+     * 只给时分秒，不带日期
+     *
+     * 日期是冗余的：弹窗标题和告警那一行已经写了时间范围，而 msg 原文
+     * 里也带着设备自报的完整时间。这一列的作用是让人看清同一秒内几条
+     * 日志的先后，8 个字符定宽正好对齐（等宽字体）
+     */
+    formatTime(time) {
+      if (!time) return '--:--:--';
+      time = time.toString();
+      const date = new Date(time.length === 10 ? time * 1000 : Number(time));
+      if (isNaN(date.getTime())) return '--:--:--';
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      return `${hours}:${minutes}:${seconds}`;
+    }
   }
 };
 </script>
@@ -183,5 +220,59 @@ export default {
 .log-count-tip {
   font-size: 12px;
   color: #909399;
+}
+
+/* 时间和事件码：定宽 + 不参与选中
+ *
+ * 定宽用 ch（等宽字体下 1ch = 一个字符宽），msg 才会从同一个横坐标起，
+ * 竖着扫一眼就能对比。原来没给宽度，事件码从 IF_UP(5) 到
+ * UNKNOWN_MNEMONIC(16) 长短不一，msg 的起点跟着飘。
+ *
+ * user-select:none 是另一件事：这两列是管线补的（采集时间、归一化
+ * 事件码），不是设备发的原文。划选复制时只该拿到 msg
+ */
+.handler-name {
+  color: #4fc3f7;
+  width: 18ch;
+  flex-shrink: 0;
+  margin-left: 10px;
+  margin-right: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* 事件码为空时（理论上不该有）也要占住位置，否则那一行的 msg 会左移 */
+.handler-name-placeholder {
+  width: 18ch;
+  flex-shrink: 0;
+  margin-left: 10px;
+  margin-right: 10px;
+  user-select: none;
+}
+
+/* msg 反过来要能自由选中。flex:1 吃掉剩余宽度，长日志自己换行 */
+.handler-msg {
+  color: #f8f9fa;
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.handler-time {
+  color: #90a4ae;
+  font-size: 13px;
+  width: 8ch;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 </style>

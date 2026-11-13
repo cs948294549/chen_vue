@@ -1,11 +1,40 @@
 <template>
   <div class="parent-nested-page">
-    <!-- 新增：操作按钮栏（全局，用于批量处理所有日志） -->
+    <!-- 级别统计条：告警页最该一眼看到的信息，点一下就按它筛选。
+         show-pending=false：这一页全是待处理的，那张卡等于重复显示总数 -->
+    <AlarmStatsBar
+      :groups="rawAlarmData"
+      :active-severity="filter_severity"
+      :active-status="filter_status"
+      :active-muted="filter_muted"
+      :has-filter="hasFilter"
+      :show-pending="false"
+      @pick="handleStatPick"
+    />
+
+    <!-- 操作栏：批量处理 + 筛选 + 展开折叠 + 刷新状态 -->
     <div class="global-operation-bar">
       <el-button type="primary" @click="handle_syslog" size="mini">处理选中告警</el-button>
-      <el-button type="success" :loading="isload" @click="extractLog" size="mini">导出日志数据</el-button>
-      <el-button type="success" @click="fresh_alarm" size="mini">刷新</el-button>
+      <el-button type="success" :loading="isload" @click="extractLog" size="mini">导出告警数据</el-button>
+      <el-button @click="expandAll" size="mini">全部展开</el-button>
+      <el-button @click="collapseAll" size="mini">全部折叠</el-button>
+
+      <el-select v-model="filter_state" placeholder="告警状态" size="mini" clearable class="filter-select">
+        <el-option label="告警" value="open"></el-option>
+        <el-option label="恢复" value="clear"></el-option>
+      </el-select>
+      <!-- 没有"处理状态"筛选框：这一页只有待处理的（后端按 status=0 过滤），
+           筛也筛不出别的。要看已处理/已忽略的去历史告警页 -->
+      <el-input v-model="filter_keyword" placeholder="事件码/对象" size="mini" clearable class="filter-input"></el-input>
+
+      <span class="op-spacer"></span>
+      <span class="refresh-tip">{{ lastRefreshText }}</span>
+      <el-button :type="autoRefresh ? 'warning' : 'info'" @click="toggleAutoRefresh" size="mini" plain>
+        {{ autoRefresh ? '暂停自动刷新' : '恢复自动刷新' }}
+      </el-button>
+      <el-button type="success" @click="fresh_alarm" size="mini" icon="el-icon-refresh">刷新</el-button>
     </div>
+
     <!-- 引入嵌套折叠列表组件 -->
     <NestedCollapseAlarmList
       :list-data="nestedAlarmListData"
@@ -15,23 +44,39 @@
       @all-select-change="changeData"
       @collapsed-state-change="handleCollapsedStateChange"
       @bnt_event="handleEvent"
+      @view-device-logs="showDeviceLogs"
     />
-    <!-- 加载中提示 -->
-    <div class="loading-tip" v-else>暂无告警</div>
+    <!-- 空态：区分"真没告警"和"筛选条件没匹配上" -->
+    <div class="loading-tip" v-else>
+      {{ rawAlarmData.length > 0 ? '当前筛选条件下没有告警，换个条件试试' : '暂无告警' }}
+    </div>
 
     <el-dialog title="查看详情" :visible.sync="diag_detail_show" width="60%" append-to-body>
       <!-- 引入日志展示组件，传入日志数据 -->
       <LogDisplay
         :log-data="serverLogData"
+        :expired="serverLogExpired"
         card-title="系统运行日志"
+        container-height="700px"
+      />
+    </el-dialog>
+
+    <!-- 设备级全部日志：不限指纹，含没产生告警的日志 -->
+    <el-dialog :title="deviceLogTitle" :visible.sync="diag_device_log_show" width="70%" append-to-body>
+      <div class="device-log-tip" v-if="deviceLogTruncated">
+        日志条数超过上限，只显示最早的 500 条。要看全部请收窄时间范围或去 ES 查
+      </div>
+      <LogDisplay
+        :log-data="deviceLogData"
+        card-title="设备日志（按时间排序）"
         container-height="700px"
       />
     </el-dialog>
 
     <el-dialog title="处理告警" width="50%" :visible.sync="diag_handle_show" destroy-on-close :close-on-click-modal="false" append-to-body>
       <el-form label-width="100px" ref="handle_form" :model="handle_feature">
-        <el-form-item label="告警类型数量" prop="counter">
-          <el-input style="width: 500px;" placeholder="告警类型数量" v-model="handle_feature.counter" disabled readonly></el-input>
+        <el-form-item label="选中告警数量" prop="selected_count">
+          <el-input style="width: 500px;" placeholder="选中告警数量" v-model="handle_feature.selected_count" disabled readonly></el-input>
         </el-form-item>
         <el-form-item label="类型" prop="p_type">
           <el-select v-model="handle_feature.status" placeholder="请选择类型">
@@ -57,13 +102,15 @@
 import NestedCollapseAlarmList from './alarm_sub/NestedCollapseAlarmList.vue';
 // 引入日志展示组件
 import LogDisplay from './alarm_sub/LogDisplay.vue';
+// 级别统计条，和历史告警页共用
+import AlarmStatsBar from './alarm_sub/AlarmStatsBar.vue';
 import alarm_api from "@/api/mapis/alarm_interface.js"
 import { downloadFile } from '@/utils/downloadUtil';
 
 export default {
   name: 'ParentNestedAlarm',
   components: {
-    NestedCollapseAlarmList,LogDisplay
+    NestedCollapseAlarmList,LogDisplay,AlarmStatsBar
   },
   data() {
     return {
@@ -75,68 +122,79 @@ export default {
       // 核心：折叠状态缓存对象（{ "ip地址": 折叠状态, ... }）
       collapsedStateCache: {},
 
-      serverLogData: [
-        {
-          msg: "2026-01-04 10:00:00 [INFO] 系统启动成功，端口：8080",
-          status: 1
-        },
-        {
-          msg: "2026-01-04 10:05:00 [WARN] 数据库连接池剩余连接数不足：5/100",
-          status: 0
-        },
-        {
-          msg: "2026-01-04 10:10:00 [ERROR] 用户登录失败，用户名：admin，错误信息：密码错误",
-          status: 0
-        }
-      ],
-      // 符合要求的嵌套式告警数据（可直接替换为接口返回数据）
-      nestedAlarmListData: [
-        {
-          "ip": "3.3.3.3",
-          "hostname": "NHZ04_M02_S125_FN_CSW1.S",
-          "children": [
-            {
-              "group_label": "e02bc7d5c2cf985f487cf1ca24360e14",
-              "alarm_type": "syslog",
-              "group_name": "up/down状态",
-              "alarm_object": "Vlan-interface11",
-              "keyword": "IFNET/5/LINK_UPDOWN",
-              "counter": 20,
-              "start_time": 1767495421,
-              "end_time": 1767495431
-            }
-          ]
-        },
-        {
-          "ip": "4.4.4.4",
-          "hostname": "NHZ04_M02_S125_FN_CSW2.S",
-          "children": [
-            {
-              "group_label": "1234567890abcdef1234567890abcdef",
-              "alarm_type": "metric",
-              "group_name": "CPU使用率过高",
-              "alarm_object": "CPU 0",
-              "keyword": "CPU_USAGE/HIGH",
-              "counter": 5,
-              "start_time": 1767495500,
-              "end_time": 1767495600
-            }
-          ]
-        }
-      ],
+      serverLogData: [],
+      serverLogExpired: false,
+
+      // 设备级全部日志
+      diag_device_log_show: false,
+      deviceLogData: [],
+      deviceLogTruncated: false,
+      deviceLogTitle: '设备日志',
+      // 接口返回的原始分组数据。页面展示的 nestedAlarmListData 由它过滤出来，
+      // 筛选条件变化时不用重新请求
+      rawAlarmData: [],
 
       alarmMenu:[
         {"name": "show_detail",'icon':"el-icon-view",'type':"primary"},
       ],
 
+      // 筛选条件
+      filter_severity:"",
+      filter_state:"",
+      filter_status:"",
+      filter_muted:"",
+      filter_keyword:"",
+
+      // 自动刷新
+      autoRefresh:true,
+      lastRefreshAt:0,
 
       isload:false,
       hanld_cache:"",
       diag_handle_show:false,
       handle_feature:{},
-      typeOptions:[{"label":"确认", "value": 1},{"label":"忽略", "value": 2},{"label":"屏蔽", "value": 3}]
+      // 没有 statusOptions：这一页后端按 status=0 过滤，没有处理状态筛选框。
+      // 要按处理状态筛去历史告警页
+      //
+      // typeOptions 是人工处理表单可选值，不加 5——系统判定忽略是 L5
+      // 定级规则自动产生的，不是人能手动选的操作
+      typeOptions:[{"label":"已确认", "value": "1"},{"label":"已处理", "value": "2"},{"label":"忽略", "value": "3"},{"label":"屏蔽", "value": "4"}]
 
     };
+  },
+  computed: {
+    // 按筛选条件过滤，子项全被滤掉的设备整组不显示
+    nestedAlarmListData() {
+      const kw = this.filter_keyword.trim().toLowerCase();
+      const groups = [];
+      this.rawAlarmData.forEach(group => {
+        const children = (group.children || []).filter(item => {
+          if (this.filter_severity && String(item.severity) !== this.filter_severity) return false;
+          if (this.filter_state && item.state !== this.filter_state) return false;
+          if (this.filter_status && String(item.status) !== this.filter_status) return false;
+          if (this.filter_muted && String(Number(item.muted)) !== this.filter_muted) return false;
+          if (kw) {
+            const hay = `${item.keyword || ''} ${item.alarm_object || ''}`.toLowerCase();
+            if (hay.indexOf(kw) === -1) return false;
+          }
+          return true;
+        });
+        if (children.length > 0) {
+          groups.push({ ...group, children: children });
+        }
+      });
+      return groups;
+    },
+    lastRefreshText() {
+      if (!this.lastRefreshAt) return '尚未刷新';
+      const d = new Date(this.lastRefreshAt);
+      const pad = (n) => n.toString().padStart(2, '0');
+      return `更新于 ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    },
+    hasFilter() {
+      return !!(this.filter_severity || this.filter_state || this.filter_status
+        || this.filter_muted || this.filter_keyword.trim());
+    }
   },
   created() {
     // 1. 组件创建时，初始化定时任务（每 30 秒执行一次）
@@ -144,6 +202,10 @@ export default {
   },
   mounted() {
     this.fresh_alarm();
+  },
+  beforeDestroy() {
+    // 定时器之前只建不收，离开页面后还在后台每 30 秒打一次接口
+    this.clearUpdateTimer();
   },
   methods:{
     /**
@@ -202,14 +264,15 @@ export default {
       // console.log("查看日志详情==", item)
       let that = this
       let post_data = {}
-      post_data["group_label"]=item["group_label"]
+      post_data["alarm_id"]=item["alarm_id"]
 
       this.serverLogData=[]
-      alarm_api.getAlarmByGroup(post_data,{}).then(function (response) {
-        // console.log("current log detail===",response.data)
+      this.serverLogExpired=false
+      alarm_api.getAlarmLogDetail(post_data,{}).then(function (response) {
         if(response.data.code==0){
-          // that.nestedAlarmListData=response.data["data"]
-          that.serverLogData=response.data["data"]
+          const detail = response.data["data"] || {}
+          that.serverLogData=detail["logs"] || []
+          that.serverLogExpired=!!detail["expired"]
           that.diag_detail_show=true
         }else{
           that.$message({
@@ -222,18 +285,65 @@ export default {
         console.log(error)
       })
     },
+
+    /**
+     * 设备级全部日志：这台设备在告警窗口内的所有日志，不限指纹
+     * @param {Object} payload { ip, hostname, start_ts, end_ts }
+     */
+    showDeviceLogs(payload){
+      let that = this
+      this.deviceLogData = []
+      this.deviceLogTruncated = false
+      this.deviceLogTitle = '设备日志 - ' + (payload.hostname || payload.ip)
+
+      alarm_api.getDeviceLogDetail({
+        ip: payload.ip,
+        start_ts: payload.start_ts,
+        end_ts: payload.end_ts
+      }, {}).then(function (response) {
+        if(response.data.code==0){
+          const detail = response.data["data"] || {}
+          that.deviceLogData = detail["logs"] || []
+          that.deviceLogTruncated = !!detail["truncated"]
+          that.diag_device_log_show = true
+          if(that.deviceLogData.length === 0){
+            that.$message({
+              type: 'info',
+              message: '这段时间内没有日志记录（alarm_log 只留 7 天）'
+            });
+          }
+        }else{
+          that.$message({
+            type: 'error',
+            message: '查询失败：'+response.data.message
+          });
+        }
+      })
+      .catch(function (error) {
+        console.log(error)
+        that.$message({ type: 'error', message: '查询异常，请重试' })
+      })
+    },
     handle_syslog(){
-      this.$set(this.handle_feature, 'counter', this.hanld_cache.length)
+      if(this.hanld_cache.length<=0){
+        this.$message({
+          type: 'error',
+          message: '未选中告警'
+        });
+        return
+      }
+      this.$set(this.handle_feature, 'selected_count', this.hanld_cache.length)
       this.diag_handle_show=true
     },
     submitHandleForm(){
       // console.log("提交状态修改===", this.hanld_cache, this.handle_feature)
       let that = this
       let post_data = {}
-      post_data["group_labels"] = this.hanld_cache
+      post_data["alarm_ids"] = this.hanld_cache
       post_data["handler"] = "chensong"
-      post_data["status"] = this.handle_feature["status"]
-      alarm_api.handleAlarmByGroup(post_data,{}).then(function (response) {
+      post_data["status"] = String(this.handle_feature["status"])
+      post_data["descr"] = this.handle_feature["descr"] || ""
+      alarm_api.handleAlarmByIds(post_data,{}).then(function (response) {
         // console.log("handle log===",response.data)
         if(response.data.code==0){
           that.$message({
@@ -256,15 +366,14 @@ export default {
 
     fresh_alarm(){
       let that = this
-      // this.nestedAlarmListData=[]
       alarm_api.getCurrentAlarm({},{}).then(function (response) {
         // console.log("current log===",response.data)
         if(response.data.code==0){
-          // that.nestedAlarmListData=response.data["data"]
-          // 关键：保留数组引用，仅清空内容并添加新数据（避免子组件整体重渲染）
           const newData = response.data["data"] || [];
-          that.nestedAlarmListData.splice(0);
-          that.nestedAlarmListData.push(...newData);
+          // 保留数组引用，仅清空内容并添加新数据（避免子组件整体重渲染）
+          that.rawAlarmData.splice(0);
+          that.rawAlarmData.push(...newData);
+          that.lastRefreshAt = Date.now();
         }else{
           that.$message({
             type: 'error',
@@ -275,6 +384,50 @@ export default {
       .catch(function (error) {
         console.log(error)
       })
+    },
+
+    /**
+     * 统计条点击：再点一次同一张卡取消该筛选
+     * @param {Object} payload { type: reset/severity/status/muted, value }
+     */
+    handleStatPick({ type, value }){
+      if(type === 'reset'){
+        this.resetFilter()
+        return
+      }
+      const field = { severity: 'filter_severity', status: 'filter_status', muted: 'filter_muted' }[type]
+      if(!field) return
+      this[field] = this[field] === value ? '' : value
+    },
+    resetFilter(){
+      this.filter_severity = ''
+      this.filter_state = ''
+      this.filter_status = ''
+      this.filter_muted = ''
+      this.filter_keyword = ''
+    },
+
+    /** 全部展开/折叠：把当前可见设备的 ip 一次性写进折叠状态缓存 */
+    expandAll(){
+      this.nestedAlarmListData.forEach(group => {
+        this.$set(this.collapsedStateCache, group.ip, true)
+      })
+    },
+    collapseAll(){
+      this.nestedAlarmListData.forEach(group => {
+        this.$set(this.collapsedStateCache, group.ip, false)
+      })
+    },
+
+    toggleAutoRefresh(){
+      this.autoRefresh = !this.autoRefresh
+      if(this.autoRefresh){
+        this.initUpdateTimer()
+        this.$message({ type: 'success', message: '已恢复 30 秒自动刷新' })
+      }else{
+        this.clearUpdateTimer()
+        this.$message({ type: 'info', message: '已暂停自动刷新' })
+      }
     },
 
     extractLog(){
@@ -288,7 +441,7 @@ export default {
         return
       }
       this.isload=true
-      alarm_api.getLogByGroup({"group_labels":this.hanld_cache},{}).then(function (response) {
+      alarm_api.getAlarmByIds({"alarm_ids":this.hanld_cache},{}).then(function (response) {
         // console.log("log extract===",response.data)
         if(response.data.code==0){
           const newData = response.data["data"] || [];
@@ -308,37 +461,38 @@ export default {
 
     getExportContent(alarm_datas){
       const device_log = {}
-      alarm_datas.forEach((log, index) => {
-        let label = `[${log["ip"]}]${log["hostname"]}`
-        if(device_log[label]){
-          device_log[label].push(log)
-        }else{
+      alarm_datas.forEach((alarm, index) => {
+        const hw = [alarm["vendor"], alarm["hardware"]].filter(Boolean).join(' ')
+        let label = `[${alarm["ip"]}]${alarm["hostname"]}${hw ? ' (' + hw + ')' : ''}`
+        if(!device_log[label]){
           device_log[label]=[]
-          device_log[label].push(log)
         }
+        device_log[label].push(alarm)
       });
       let exportContent = '';
 
-      // 2. 遍历顶层对象（获取 hostname 和对应的日志数组）
+      // 遍历顶层对象（获取 hostname 和对应的告警数组）
       const hostnameEntries = Object.entries(device_log);
-      for (const [hostname, hostnameLogs] of hostnameEntries) {
-        // 2.1 拼接 hostname 分隔符（格式：=======hostname=========）
+      for (const [hostname, hostnameAlarms] of hostnameEntries) {
+        // 拼接 hostname 分隔符（格式：=======hostname=========）
         const separator = `\n=======${hostname}=========\n`;
         exportContent += separator;
 
-        // 2.3 拼接当前 hostname 下的所有日志内容
-        hostnameLogs.forEach((log, index) => {
-          const logLine = `${log.msg}\n`;
+        // 拼接当前 hostname 下的所有聚合告警，一行一条。object_alias
+        // 目前只有接口对象会有值（端口描述），没有就不加这段括号
+        hostnameAlarms.forEach((alarm, index) => {
+          const objectText = alarm.object_alias ? `${alarm.alarm_object}(${alarm.object_alias})` : alarm.alarm_object;
+          const logLine = `[P${alarm.severity}][${alarm.state}] ${alarm.keyword} ${objectText} 条数:${alarm.counter} ${alarm.msg}\n`;
           exportContent += logLine;
         });
       }
 
-      // 3. 生成带时间戳的文件名
+      // 生成带时间戳的文件名
       const now = new Date();
       const timeStr = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
       const fileName = `switch_log_${timeStr}.log`;
 
-      // 3. 调用下载工具函数
+      // 调用下载工具函数
       downloadFile(exportContent, fileName, 'text/plain');
     }
 
@@ -347,44 +501,73 @@ export default {
 };
 </script>
 
-<style>
+<style scoped>
+/* 原来写死 max-height:600px，告警一多就全挤在一个小滚动框里，
+   外面大片空白。改成跟着视口走，页面自己滚 */
 .parent-nested-page {
   width: 95%;
   max-width: 1600px;
-  margin: 50px auto;
-  padding: 25px;
+  margin: 20px auto;
+  padding: 20px;
   background-color: #f5f7fa;
   border-radius: 10px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  height: 100%;
-  max-height: 600px;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-h3 {
-  font-size: 18px;
-  color: #333;
-  margin-bottom: 25px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e4e7ed;
+  box-sizing: border-box;
 }
 
 .loading-tip {
   font-size: 14px;
   color: #606266;
-  padding: 30px;
+  padding: 50px 30px;
   text-align: center;
+  background-color: #ffffff;
+  border: 1px dashed #e4e7ed;
+  border-radius: 8px;
 }
 
-/* 全局操作按钮栏 */
+/* 统计条的样式在 alarm_sub/AlarmStatsBar.vue 里 */
+
+/* ---------- 操作/筛选栏 ---------- */
 .global-operation-bar {
-  margin-bottom: 20px;
-  padding: 15px 20px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border: 1px solid #e4e7ed;
   border-radius: 8px;
-  border-bottom: 1px solid #e4e7ed;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-select {
+  width: 120px;
+}
+
+.filter-input {
+  width: 160px;
+}
+
+/* 把刷新相关的挤到最右边，和左边的操作按钮分开 */
+.op-spacer {
+  flex: 1;
+  min-width: 10px;
+}
+
+.refresh-tip {
+  font-size: 12px;
+  color: #909399;
+  white-space: nowrap;
+}
+
+/* 设备日志超上限的提示 */
+.device-log-tip {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #e6a23c;
+  background-color: #fdf6ec;
+  border: 1px solid #faecd8;
+  border-radius: 4px;
 }
 </style>

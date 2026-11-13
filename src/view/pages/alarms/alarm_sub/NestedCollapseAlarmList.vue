@@ -8,7 +8,7 @@
         :key="outerItem.ip+outerItem.hostname || outerIndex"
         v-if="outerItem"
       >
-        <!-- 外层表层（多选框、IP、设备名、折叠按钮） -->
+        <!-- 外层表层（多选框、设备名、IP、告警汇总、折叠按钮） -->
         <div class="outer-item-header" @click="toggleOuterExpand(outerIndex)">
           <!-- 外层多选框 -->
           <input
@@ -19,11 +19,37 @@
             @click.stop
             @change="handleOuterCheckChange(outerItem, outerIndex)"
           >
-          <!-- 外层表层内容 -->
+          <!-- 外层表层内容：设备名为主，IP 次之。vendor/hardware 是 L4
+               富化结果，排查时不用再现查 devices 表 -->
           <div class="outer-header-content">
-            <span class="ip-field" :title="outerItem.ip || '未知IP'">IP：{{ outerItem.ip || '未知IP' }}</span>
-            <span class="hostname-field" :title="outerItem.hostname || '未知设备名'">设备名：{{ outerItem.hostname || '未知设备名' }}</span>
+            <span class="hostname-field" :title="outerItem.hostname || '未知设备名'">
+              {{ outerItem.hostname || '未知设备名' }}
+            </span>
+            <span class="ip-field" :title="outerItem.ip || '未知IP'">{{ outerItem.ip || '未知IP' }}</span>
+            <span class="hardware-field" v-if="outerItem.vendor || outerItem.hardware">
+              {{ [outerItem.vendor, outerItem.hardware].filter(Boolean).join(' ') }}
+            </span>
           </div>
+          <!-- 不展开也能看到这台设备下有什么。summary 在 initFormattedList
+               里算好挂上来，不在模板里反复调方法 -->
+          <div class="outer-summary" v-if="outerItem.summary">
+            <span class="sum-badge sum-p1" v-if="outerItem.summary.p1">P1×{{ outerItem.summary.p1 }}</span>
+            <span class="sum-badge sum-p2" v-if="outerItem.summary.p2">P2×{{ outerItem.summary.p2 }}</span>
+            <span class="sum-badge sum-p3" v-if="outerItem.summary.p3">P3×{{ outerItem.summary.p3 }}</span>
+            <span class="sum-badge sum-muted" v-if="outerItem.summary.muted">静默×{{ outerItem.summary.muted }}</span>
+            <span class="sum-total">共 {{ outerItem.summary.total }} 条</span>
+          </div>
+          <!-- 按设备看这段时间的全部日志。和子项那个"查看详情"不一样：
+               那个只给某条告警自己的日志（按指纹），这个把窗口内这台设备
+               所有进了管线的日志都拉出来，包括没产生告警的 -->
+          <el-button
+            class="outer-log-btn"
+            type="info"
+            icon="el-icon-document"
+            size="mini"
+            plain
+            @click.stop="viewDeviceLogs(outerItem)"
+          >全部日志</el-button>
           <!-- 外层折叠/展开按钮 -->
           <div class="outer-toggle-btn" :class="{ active: outerItem.isExpanded || false }">
             ▶
@@ -36,7 +62,7 @@
             <li
               class="inner-list-item"
               v-for="(innerItem, innerIndex) in outerItem.children"
-              :key="innerItem.group_label || innerIndex"
+              :key="innerItem.alarm_id || innerIndex"
               v-if="innerItem"
             >
               <!-- 内层子项多选框 -->
@@ -47,45 +73,47 @@
                 :value="getInnerItemUniqueKey(innerItem)"
                 @click.stop
               >
-              <!-- 内层子项内容 -->
+              <!-- 内层子项内容：第一行徽标+告警对象+操作，第二行弱化的明细 -->
               <div class="inner-item-content">
-                <!-- <div class="inner-detail-row">
-                  <span class="detail-label">分组标签：</span>
-                  <span class="detail-value" :title="innerItem.group_label || '未知'">{{ innerItem.group_label || '未知' }}</span>
-                </div> -->
-                <div class="inner-detail-row">
-                  <span class="detail-label">告警类型：</span>
-                  <span class="detail-value" :title="innerItem.alarm_type || '未知'">{{ innerItem.alarm_type || '未知' }}</span>
-                </div>
-                <div class="inner-detail-row">
-                  <span class="detail-label">分组名称：</span>
-                  <span class="detail-value" :title="innerItem.group_name || '未知'">{{ innerItem.group_name || '未知' }}</span>
-                </div>
-                <div class="inner-detail-row">
-                  <span class="detail-label">告警对象：</span>
-                  <span class="detail-value" :title="innerItem.alarm_object || '未知'">{{ innerItem.alarm_object || '未知' }}</span>
-                </div>
-                <div class="inner-detail-row">
-                  <span class="detail-label">关键字：</span>
-                  <span class="detail-value" :title="innerItem.keyword || '未知'">{{ innerItem.keyword || '未知' }}</span>
-                </div>
-                <div class="inner-detail-row">
-                  <span class="detail-label">告警数量：</span>
-                  <span class="detail-value">{{ innerItem.counter || 0 }} 条</span>
-                </div>
-                <div class="inner-detail-row">
-                  <span class="detail-label">时间范围：</span>
-                  <span class="detail-value">{{ formatTimestamp(innerItem.start_time) }} - {{ formatTimestamp(innerItem.end_time) }}</span>
-                </div>
-                <div class="inner-detail-row">
-                  <span class="detail-label">菜单：</span>
+                <div class="inner-main-row">
+                  <span class="severity-tag" :class="'severity-' + innerItem.severity">
+                    {{ severityText(innerItem.severity) }}
+                  </span>
+                  <!-- status=5（系统判定忽略）的 state 是 idle，不是 open/clear 的
+                       二元状态——它从来没"告警"过，不能套用 clear 的文案 -->
+                  <span v-if="String(innerItem.status) === '5'" class="state-tag state-ignored">
+                    已忽略
+                  </span>
+                  <span v-else class="state-tag" :class="innerItem.state === 'open' ? 'state-open' : 'state-clear'">
+                    {{ innerItem.state === 'open' ? '告警' : '恢复' }}
+                  </span>
+                  <span class="muted-tag" v-if="Number(innerItem.muted) === 1">静默中</span>
+                  <span class="alarm-object" :title="innerItem.alarm_object || '-'">
+                    {{ innerItem.alarm_object || '-' }}
+                  </span>
+                  <!-- object_alias 是 L4 查到的对象描述，目前只有接口对象会有值
+                       （端口描述），其它对象类型是空串，不展示 -->
+                  <span class="object-alias" v-if="innerItem.object_alias" :title="innerItem.object_alias">
+                    {{ innerItem.object_alias }}
+                  </span>
+                  <span class="inner-main-spacer"></span>
                   <el-button
                     v-for="(menu_item, menu_idx) in menuList"
                     :type="menu_item['type']?menu_item['type']:'primary'"
                     :icon="menu_item['icon']" size="mini"
                     :key="menu_item['name']"
                     @click="submit_action(menu_item['name'],innerItem)" circle></el-button>
-                  <!-- <el-button type="primary" icon="el-icon-view" size="mini" @click="show_detail(innerItem)" circle></el-button> -->
+                </div>
+                <div class="inner-meta-row">
+                  <span class="meta-code" :title="innerItem.keyword || '-'">{{ innerItem.keyword || '-' }}</span>
+                  <span class="meta-sep">·</span>
+                  <span>{{ innerItem.counter || 0 }} 条</span>
+                  <span class="meta-sep">·</span>
+                  <span>{{ formatRange(innerItem.first_seen, innerItem.last_seen) }}</span>
+                  <span class="meta-sep">·</span>
+                  <span :class="{ 'meta-pending': String(innerItem.status) === '0' }">
+                    {{ statusText(innerItem.status) }}
+                  </span>
                 </div>
               </div>
             </li>
@@ -219,7 +247,8 @@ export default {
         const cachedExpandedState = this.collapsedStateCache[outerItem.ip] || false;
         return {
           ...outerItem,
-          isExpanded: cachedExpandedState // 从缓存还原，而非直接赋值 false
+          isExpanded: cachedExpandedState, // 从缓存还原，而非直接赋值 false
+          summary: this.deviceSummary(outerItem)
         };
       });
 
@@ -234,11 +263,79 @@ export default {
         return;
       }
 
-      // 遍历格式化列表，更新 isExpanded 为缓存中的最新状态
+      // 遍历格式化列表，更新 isExpanded 为缓存中的最新状态。
+      // 缓存里有这个 ip 就按缓存的值来（包括 false）——原来写
+      // cache[ip] || isExpanded || false，已展开的项再被置成 false 时
+      // 会被自己的旧值顶掉，父组件的"全部折叠"按钮按不动
       this.formattedOuterList = this.formattedOuterList.map(outerItem => ({
         ...outerItem,
-        isExpanded: cache[outerItem.ip] || outerItem.isExpanded || false
+        isExpanded: Object.prototype.hasOwnProperty.call(cache, outerItem.ip)
+          ? !!cache[outerItem.ip]
+          : (outerItem.isExpanded || false)
       }));
+    },
+
+    /**
+     * 单台设备下的告警汇总，不展开也能看到里面有什么
+     * @param {Object} outerItem 外层列表项
+     * @returns {Object} { p1, p2, p3, muted, pending, total }
+     */
+    deviceSummary(outerItem) {
+      const children = (outerItem && outerItem.children) || [];
+      const summary = { p1: 0, p2: 0, p3: 0, muted: 0, pending: 0, total: children.length };
+      children.forEach(item => {
+        const key = 'p' + (Number(item.severity) || 3);
+        if (summary[key] !== undefined) summary[key] += 1;
+        if (Number(item.muted) === 1) summary.muted += 1;
+        if (String(item.status) === '0') summary.pending += 1;
+      });
+      return summary;
+    },
+
+    /**
+     * 按设备看全部日志：算出这组告警的时间窗口，交给父组件去查
+     *
+     * 窗口取这台设备所有子告警的最早 first_seen ~ 最晚 last_seen/clear_time，
+     * 两头各放宽 30 秒 —— 要看的恰恰是告警前后那几条伴生日志（速率协商、
+     * 双工变化），卡死在告警时间上就把它们切掉了。
+     *
+     * 后端限了跨度 1 天，所以这里不用再截，但窗口超过 1 天时后端会拒绝，
+     * 这种情况只会出现在历史告警页按大范围筛选之后 —— 那时让用户把筛选
+     * 条件收窄比在这里偷偷截断更清楚
+     */
+    viewDeviceLogs(outerItem) {
+      const children = (outerItem && outerItem.children) || [];
+      if (children.length === 0) return;
+
+      const pad = 30;
+      let start = null;
+      let end = null;
+      children.forEach(item => {
+        const first = Number(item.first_seen) || 0;
+        // 已恢复的取 clear_time，还在告警的取 last_seen
+        const last = Number(item.clear_time) || Number(item.last_seen) || first;
+        if (first > 0 && (start === null || first < start)) start = first;
+        if (last > 0 && (end === null || last > end)) end = last;
+      });
+      if (start === null || end === null) return;
+
+      this.$emit('view-device-logs', {
+        ip: outerItem.ip,
+        hostname: outerItem.hostname,
+        start_ts: start - pad,
+        end_ts: end + pad
+      });
+    },
+
+    /**
+     * 时间范围：同一天只在末端显示时分秒，跨天两头都带日期
+     */
+    formatRange(first, last) {
+      const start = this.formatTimestamp(first, true);
+      if (!last || String(last) === String(first)) return start;
+      const sameDay = new Date(Number(first) * 1000).toDateString()
+        === new Date(Number(last) * 1000).toDateString();
+      return start + ' ~ ' + this.formatTimestamp(last, !sameDay);
     },
 
     /**
@@ -304,29 +401,36 @@ export default {
     /**
      * 获取内层子项的唯一标识
      * @param {Object} innerItem 内层子项数据
-     * @returns {String} 唯一标识（优先使用 group_label）
+     * @returns {String} 唯一标识（优先使用 alarm_id）
      */
     getInnerItemUniqueKey(innerItem) {
       if (!innerItem) return '';
-      return innerItem.group_label || `${innerItem.alarm_object || '未知对象'}-${Math.random().toString(36).substr(2, 8)}`;
+      return innerItem.alarm_id || `${innerItem.alarm_object || '未知对象'}-${Math.random().toString(36).substr(2, 8)}`;
+    },
+
+    severityText(severity) {
+      const map = { 1: 'P1', 2: 'P2', 3: 'P3' };
+      return map[Number(severity)] || 'P3';
+    },
+
+    statusText(status) {
+      const map = { '0': '待处理', '1': '已确认', '2': '已处理', '3': '忽略', '4': '屏蔽', '5': '系统判定忽略' };
+      return map[String(status)] || '待处理';
     },
 
     /**
-     * 时间戳格式化（转换为 Y-m-d H:i:s）
+     * 时间戳格式化
      * @param {Number} timestamp 10 位时间戳
+     * @param {Boolean} withDate 是否带月-日前缀
      * @returns {String} 格式化后的时间
      */
-    formatTimestamp(timestamp) {
+    formatTimestamp(timestamp, withDate) {
       if (!timestamp || isNaN(timestamp)) return '未知时间';
-      const date = new Date(timestamp * 1000); // 10 位时间戳转毫秒
-      return date.toLocaleString('zh-CN', {
-        // year: 'numeric',
-        // month: '2-digit',
-        // day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      }).replace(/\//g, '-');
+      const date = new Date(Number(timestamp) * 1000); // 10 位时间戳转毫秒
+      const pad = (n) => n.toString().padStart(2, '0');
+      const clock = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+      if (!withDate) return clock;
+      return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${clock}`;
     },
 
     // 原有汇总数据发射方法（不变）
@@ -393,28 +497,74 @@ export default {
   accent-color: #409eff;
 }
 
-/* 外层表层内容 */
+/* 外层表层内容：设备名为主，IP 次之 */
 .outer-header-content {
   flex: 1;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: #333333;
-}
-
-.ip-field {
-  font-size: 14px;
-  font-weight: 500;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
   color: #333333;
 }
 
 .hostname-field {
   font-size: 14px;
-  color: #606266;
-  max-width: 400px;
+  font-weight: 600;
+  color: #303133;
+  max-width: 420px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ip-field {
+  font-size: 12px;
+  color: #909399;
+  font-family: "Consolas", "Monaco", "Menlo", monospace;
+}
+
+.hardware-field {
+  font-size: 12px;
+  color: #909399;
+  padding: 1px 6px;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* 设备头部的告警汇总 */
+.outer-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.sum-badge {
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.sum-p1 { background-color: #f56c6c; }
+.sum-p2 { background-color: #e6a23c; }
+.sum-p3 { background-color: #909399; }
+.sum-muted { background-color: #c0c4cc; }
+
+.sum-total {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 2px;
+  white-space: nowrap;
+}
+
+/* 设备级"全部日志"按钮，和折叠箭头之间留点距离 */
+.outer-log-btn {
+  margin-right: 10px;
+  flex-shrink: 0;
 }
 
 /* 外层折叠/展开按钮 */
@@ -463,7 +613,7 @@ export default {
 .inner-list-item {
   display: flex;
   align-items: flex-start;
-  padding: 12px;
+  padding: 10px 12px;
   background-color: #ffffff;
   border: 1px solid #f0f2f5;
   border-radius: 6px;
@@ -480,39 +630,82 @@ export default {
   width: 16px;
   height: 16px;
   margin-right: 12px;
-  margin-top: 3px;
+  margin-top: 4px;
   cursor: pointer;
   accent-color: #409eff;
+  flex-shrink: 0;
 }
 
-/* 内层子项内容 */
+/* 内层子项内容：两行卡片 */
 .inner-item-content {
   flex: 1;
+  min-width: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 15px 25px;
+  flex-direction: column;
+  gap: 6px;
   font-size: 13px;
 }
 
-.inner-detail-row {
+/* 第一行：徽标 + 告警对象 + 操作按钮 */
+.inner-main-row {
   display: flex;
   align-items: center;
-  min-width: 200px;
+  gap: 6px;
+  min-width: 0;
 }
 
-.detail-label {
-  color: #909399;
-  margin-right: 8px;
-  white-space: nowrap;
+.inner-main-spacer {
+  flex: 1;
 }
 
-.detail-value {
-  color: #333333;
-  font-weight: 500;
-  max-width: 250px;
+.alarm-object {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-left: 2px;
+  max-width: 420px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: "Consolas", "Monaco", "Menlo", monospace;
+}
+
+.object-alias {
+  font-size: 12px;
+  color: #909399;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 第二行：弱化的明细 */
+.inner-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.meta-code {
+  color: #606266;
+  font-weight: 500;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta-sep {
+  color: #dcdfe6;
+}
+
+/* 待处理高亮一下，扫视时能分出哪些还没人看 */
+.meta-pending {
+  color: #e6a23c;
+  font-weight: 500;
 }
 
 /* 内层无数据提示 */
@@ -521,6 +714,43 @@ export default {
   text-align: center;
   font-size: 13px;
   color: #909399;
+}
+
+/* 级别/状态徽标 */
+.severity-tag, .state-tag, .muted-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 级别用实心，最刺眼的留给 P1 */
+.severity-tag {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.severity-1 { background-color: #f56c6c; }
+.severity-2 { background-color: #e6a23c; }
+.severity-3 { background-color: #909399; }
+
+/* 状态用描边，和级别区分开，不然一行里两块实心色块分不清谁是谁 */
+.state-tag {
+  background-color: transparent;
+  border: 1px solid;
+}
+
+.state-open { color: #f56c6c; border-color: #fbc4c4; background-color: #fef0f0; }
+.state-clear { color: #67c23a; border-color: #c2e7b0; background-color: #f0f9eb; }
+.state-ignored { color: #909399; border-color: #e4e7ed; background-color: #f4f4f5; }
+
+.muted-tag {
+  color: #909399;
+  border: 1px solid #e4e7ed;
+  background-color: #f4f4f5;
 }
 
 /* 已选状态汇总 */

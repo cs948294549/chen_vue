@@ -4,10 +4,11 @@
  */
 
 // 地址位置可选类型（range 只在地址组条目里出现，不在此处）
+// 单主机不单设类型：设备回显 permit ip any host 10.18.71.16 最终是 10.18.71.16/32，
+// 所以主机就是 network + /32，没有 host 类型
 export const addrTypeOptions = [
   { value: "any", label: "any（任意）" },
-  { value: "network", label: "网段（CIDR）" },
-  { value: "host", label: "主机（/32）" },
+  { value: "network", label: "网段/主机（CIDR，主机写 /32）" },
   { value: "addrgroup", label: "地址组" }
 ]
 
